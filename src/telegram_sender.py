@@ -141,24 +141,24 @@ def build_caption(order):
     employee match the printed label with the right items in the warehouse.
 
     We show the SKU instead of the product name because product names on
-    Shopee are very long (e.g. "ITBisa - Socket IC DIP 16 Pin 2.54mm
+    Tiktok Shop are very long (e.g. "ITBisa - Socket IC DIP 16 Pin 2.54mm
     Narrow 2x8 Lubang 8x2 Dudukan IC DIP16 untuk PCB Arduino & Project
     Elektronika"), but warehouse shelves are organized by SKU. SKU is
     short, precise, and matches how items are physically labeled.
 
-    We do not show recipient name or address because Shopee masks them
+    We do not show recipient name or address because Tiktok Shop masks them
     in their API responses. The full unmasked details are visible on the
     printed label itself, so the employee can see them when packing.
 
     Args:
-      order: the order dict returned by shopee_client.
+      order: the order dict returned by tiktokshop_client.
 
     Returns:
       A formatted string ready to use as a Telegram caption.
     """
 
     # STEP 1: Pull out the basic fields.
-    order_sn = order.get("order_sn", "?")
+    order_id = order.get("order_id", "?")
     courier = order.get("shipping_carrier") or "?"
 
     # STEP 2: Build a short summary of items using SKUs.
@@ -172,7 +172,7 @@ def build_caption(order):
 
     # STEP 3: Assemble the caption in Bahasa Indonesia.
     caption = (
-        f"📦 {order_sn}\n"
+        f"📦 {order_id}\n"
         f"🚚 {courier}\n"
         f"\n"
         f"Barang:\n"
@@ -183,9 +183,9 @@ def build_caption(order):
 
 def _pick_sku(item):
     """
-    Returns the most specific SKU for a Shopee order item.
+    Returns the most specific SKU for a Tiktok Shop order item.
 
-    Shopee's item_list entries may include both:
+    Tiktok Shop's item_list entries may include both:
       - item_sku:  the parent product SKU ("SKU Utama")
       - model_sku: the variant SKU when the product has variants ("SKU Varian")
 
