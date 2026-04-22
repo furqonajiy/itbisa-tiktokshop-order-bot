@@ -1,32 +1,23 @@
 """
 bootstrap_tokens.py
 -------------------
-One-time script to seed data/shopee_tokens.json with initial tokens.
+One-time script to seed data/tiktokshop_tokens.json with initial tokens.
 
 When to run this:
   - The very first time you set up the bot.
-  - After the refresh_token expires (every 30 days) and you need to re-authorize.
-  - When switching between sandbox and live environments.
+  - After the refresh_token expires and you need to re-authorize.
+  - When switching apps or environments.
 
 How to use it:
-  1. Log into Shopee Open Platform Console.
-  2. Go to App List and click "Authorize" on your app.
-  3. Paste the shop URL (or use the test shop for sandbox) and confirm.
-  4. After redirect, copy the "code" value from the URL.
-     Example: https://example.com/?code=ABC123...&shop_id=XXX
-  5. Run this script and paste the code when prompted.
-  6. The script writes data/shopee_tokens.json with valid tokens.
-
-Make sure SHOPEE_API_BASE_URL in config.py points to the right environment
-(sandbox or live) BEFORE running this script. The tokens you receive will
-only work for that specific environment.
+  1. Log into TikTok Shop Open Platform.
+  2. Authorize your app for the target shop.
+  3. After redirect, copy the auth_code value from the URL.
+  4. Run this script and paste the auth_code when prompted.
+  5. The script writes data/tiktokshop_tokens.json with valid tokens.
 """
 
-import hashlib
-import hmac
 import json
 import sys
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -39,75 +30,61 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src import config
 
 
+
 def main():
     """Interactive bootstrap flow."""
 
     print("=" * 60)
-    print("Shopee Tokens Bootstrap")
+    print("TikTok Shop Tokens Bootstrap")
     print("=" * 60)
-    print(f"Target environment: {config.SHOPEE_API_BASE_URL}")
-    print(f"Partner ID: {config.SHOPEE_PARTNER_ID}")
-    print(f"Shop ID: {config.SHOPEE_SHOP_ID}")
-    print()
-    print("Make sure the target environment above matches where you got")
-    print("the authorization code from. Sandbox codes do not work on live,")
-    print("and vice versa.")
+    print(f"Target environment: {config.TIKTOKSHOP_API_BASE_URL}")
+    print(f"App Key: {config.TIKTOKSHOP_APP_KEY}")
+    print(f"Shop ID: {config.TIKTOKSHOP_SHOP_ID}")
     print()
 
     # STEP 1: Prompt for the authorization code.
-    code = input("Paste the authorization code from the Shopee Console URL: ").strip()
-    if not code:
-        print("No code provided. Aborting.")
+    auth_code = input("Paste the auth_code from the TikTok Shop redirect URL: ").strip()
+    if not auth_code:
+        print("No auth_code provided. Aborting.")
         sys.exit(1)
 
-    # STEP 2: Build the signed request to exchange the code for tokens.
-    # The auth endpoint uses a simpler signature format than shop-level calls:
-    # only partner_id + path + timestamp (no access_token, no shop_id).
-    path = "/api/v2/auth/token/get"
-    timestamp = int(time.time())
-
-    base_string = f"{config.SHOPEE_PARTNER_ID}{path}{timestamp}"
-    signature = hmac.new(
-        config.SHOPEE_PARTNER_KEY.encode("utf-8"),
-        base_string.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-    url = (
-        f"{config.SHOPEE_API_BASE_URL}{path}"
-        f"?partner_id={config.SHOPEE_PARTNER_ID}"
-        f"&timestamp={timestamp}"
-        f"&sign={signature}"
-    )
-
+    # STEP 2: Build the request body exactly as the public TikTok Shop Open API
+    # collection expects it.
+    path = "/api/token/getAccessToken"
+    url = f"{config.TIKTOKSHOP_API_BASE_URL}{path}"
     body = {
-        "code": code,
-        "partner_id": config.SHOPEE_PARTNER_ID,
-        "shop_id": config.SHOPEE_SHOP_ID,
+        "app_key": config.TIKTOKSHOP_APP_KEY,
+        "app_secret": config.TIKTOKSHOP_APP_SECRET,
+        "grant_type": "authorized_code",
+        "auth_code": auth_code,
     }
 
     # STEP 3: Call the endpoint.
     print(f"\nCalling {path}...")
     response = requests.post(url, json=body, timeout=30)
     print(f"Status: {response.status_code}")
-    data = response.json()
+    data = _safe_json(response)
 
     # STEP 4: Check for errors.
-    if response.status_code != 200 or data.get("error"):
-        print(f"\nShopee rejected the request:")
-        print(json.dumps(data, indent=2))
-        print("\nCommon causes:")
-        print("  - Code already used (each code is single-use)")
-        print("  - Code expired (codes are valid for ~10 minutes)")
-        print("  - Wrong environment (sandbox code used against live URL or vice versa)")
-        print("  - Wrong partner_id or partner_key")
+    if response.status_code != 200 or _has_api_error(data):
+        print("\nTikTok Shop rejected the request:")
+        print(json.dumps(data, indent=2, ensure_ascii=False))
         sys.exit(1)
 
     # STEP 5: Extract the tokens and compute the absolute expiry timestamp.
-    access_token = data["access_token"]
-    refresh_token = data["refresh_token"]
-    expire_in_seconds = data["expire_in"]
-    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expire_in_seconds)
+    payload = _extract_payload(data)
+    access_token = payload["access_token"]
+    refresh_token = payload["refresh_token"]
+    expire_in_seconds = int(
+        payload.get("access_token_expire_in")
+        or payload.get("expire_in")
+        or payload.get("expires_in")
+        or 0
+    )
+    if expire_in_seconds <= 0:
+        expires_at = datetime.now(timezone.utc)
+    else:
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expire_in_seconds)
 
     tokens = {
         "access_token": access_token,
@@ -118,16 +95,38 @@ def main():
     # STEP 6: Write the tokens file.
     tokens_path = Path(config.TOKENS_FILE_PATH)
     tokens_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(tokens_path, "w") as f:
+    with open(tokens_path, "w", encoding="utf-8") as f:
         json.dump(tokens, f, indent=2, sort_keys=True)
 
     print(f"\n✓ Wrote tokens to {tokens_path}")
     print(f"  access_token:  {access_token[:12]}... (truncated)")
     print(f"  refresh_token: {refresh_token[:12]}... (truncated)")
     print(f"  expires at:    {expires_at.isoformat()}")
-    print(f"\nYou can now run the bot normally. The bot will auto-refresh")
-    print(f"the access_token every 4 hours. You only need to run this")
-    print(f"script again when the refresh_token expires in 30 days.")
+
+
+
+def _safe_json(response):
+    try:
+        return response.json()
+    except ValueError:
+        return {}
+
+
+
+def _has_api_error(data):
+    code = data.get("code")
+    if code in (None, 0, "0"):
+        return False
+    return True
+
+
+
+def _extract_payload(data):
+    if isinstance(data.get("data"), dict):
+        return data["data"]
+    if isinstance(data.get("response"), dict):
+        return data["response"]
+    return data
 
 
 if __name__ == "__main__":
