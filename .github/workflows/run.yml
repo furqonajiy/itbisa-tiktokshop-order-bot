@@ -1,4 +1,4 @@
-# GitHub Actions workflow for the ITBisa Shopee Order Bot.
+# GitHub Actions workflow for the ITBisa Tiktok Shop Order Bot.
 #
 # This workflow runs the Python script every day on a schedule
 # based on Jakarta time (WIB = UTC+7).
@@ -12,11 +12,13 @@
 # State file management:
 #   This workflow uses TWO branches:
 #     - main: source code, protected by branch rules requiring PRs.
-#     - bot-state: runtime state files (processed_orders.json, shopee_tokens.json).
+#     - bot-state: runtime state files
+#         - data/processed_orders.json
+#         - data/shopee_tokens.json  (temporary until auth migration)
 #   This separation lets the bot commit state freely without touching main.
 #   See README "State Management" section for setup details.
 
-name: Run Shopee Order Bot
+name: Run Tiktok Shop Order Bot
 
 on:
   # STEP 1: Run on a cron schedule. GitHub Actions cron uses UTC.
@@ -72,6 +74,7 @@ jobs:
         run: pip install -r requirements.txt
 
       # STEP 9: Run the bot. Secrets come from GitHub Actions Secrets.
+      # Temporary: still using Shopee secrets until auth/client migration.
       - name: Run order processor
         env:
           SHOPEE_PARTNER_ID: ${{ secrets.SHOPEE_PARTNER_ID }}

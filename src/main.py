@@ -48,7 +48,7 @@ def run():
     """Runs one full cycle. Returns nothing. Prints progress to stdout."""
 
     print("=" * 60)
-    print("ITBisa Shopee Order Bot - starting run")
+    print("ITBisa Tiktok Shop Order Bot - starting run")
     print("=" * 60)
 
     # STEP 0: Wrap the whole run in a try block so we can catch the one
@@ -76,7 +76,7 @@ def _do_run():
 
     # STEP 1: Load the dictionary of orders we already processed.
     processed = state_manager.load()
-    print(f"Loaded state: {len(processed)} previously processed orders remembered")
+    print(f"Loaded Tiktok Shop state: {len(processed)} previously processed orders remembered")
 
     # STEP 2: Fetch all orders that need a label printed. This includes both
     # READY_TO_SHIP (need shipment arrangement first) and PROCESSED (label
@@ -147,7 +147,7 @@ def _do_run():
             skipped_count += 1
             continue
 
-            # STEP 6c: Convert the PDF to one or more PNG images.
+        # STEP 6c: Convert the PDF to one or more PNG images.
         png_pages = label_processor.pdf_to_pngs(pdf_bytes)
         print(f"  Rendered {len(png_pages)} label page(s) from PDF")
 

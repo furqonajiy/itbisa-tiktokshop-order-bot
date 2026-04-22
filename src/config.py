@@ -13,6 +13,11 @@ For local development:
   load_dotenv() call below will read it automatically. In GitHub Actions
   there is no .env file, so load_dotenv() does nothing and the values come
   from the workflow's `env:` block instead.
+
+Migration note:
+  Step 1 (processed-order state tracking) keeps a general state filename.
+  The authentication and API settings below are still Shopee-specific for now
+  and will be migrated in later steps.
 """
 
 import os
@@ -42,8 +47,7 @@ USE_FAKE_SHOPEE = os.environ.get("USE_FAKE_SHOPEE", "false").lower() == "true"
 
 
 # STEP 3: Read Shopee API credentials.
-# You get these from the Shopee Open Platform when you register your app.
-# In fake mode these are optional, so we use .get() with empty string defaults.
+# Temporary: still Shopee-specific until the auth/client migration steps.
 if USE_FAKE_SHOPEE:
     SHOPEE_PARTNER_ID = int(os.environ.get("SHOPEE_PARTNER_ID", "0"))
     SHOPEE_PARTNER_KEY = os.environ.get("SHOPEE_PARTNER_KEY", "")
@@ -64,8 +68,14 @@ TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 # File paths are anchored to PROJECT_ROOT so they always resolve to the same
 # place regardless of where Python was launched from.
 SHOPEE_API_BASE_URL = "https://partner.shopeemobile.com"
+
+# STEP 6: General processed-order state file used by this bot.
 STATE_FILE_PATH = str(PROJECT_ROOT / "data" / "processed_orders.json")
+
+# STEP 7: Temporary: still Shopee-specific until auth migration.
 TOKENS_FILE_PATH = str(PROJECT_ROOT / "data" / "shopee_tokens.json")
+
+# STEP 8: Runtime safety and formatting settings.
 MAX_ORDERS_PER_RUN = 30  # Safety cap. If we see more than this, something is wrong.
 LABEL_IMAGE_DPI = 200    # Resolution for PDF -> PNG conversion.
 STATE_RETENTION_DAYS = 30  # How long to remember processed orders before pruning.
