@@ -13,11 +13,6 @@ For local development:
   load_dotenv() call below will read it automatically. In GitHub Actions
   there is no .env file, so load_dotenv() does nothing and the values come
   from the workflow's `env:` block instead.
-
-Migration note:
-  Step 1 (processed-order state tracking) keeps a general state filename.
-  The authentication and API settings below are still Shopee-specific for now
-  and will be migrated in later steps.
 """
 
 import os
@@ -41,21 +36,22 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 # STEP 2: Check if we are running in fake mode.
-# When fake mode is on, the Shopee credentials are not required because
+# When fake mode is on, the TikTok Shop credentials are not required because
 # we never call the real API. This makes local testing easier.
-USE_FAKE_SHOPEE = os.environ.get("USE_FAKE_SHOPEE", "false").lower() == "true"
+USE_FAKE_TIKTOKSHOP = os.environ.get("USE_FAKE_TIKTOKSHOP", "false").lower() == "true"
 
 
-# STEP 3: Read Shopee API credentials.
-# Temporary: still Shopee-specific until the auth/client migration steps.
-if USE_FAKE_SHOPEE:
-    SHOPEE_PARTNER_ID = int(os.environ.get("SHOPEE_PARTNER_ID", "0"))
-    SHOPEE_PARTNER_KEY = os.environ.get("SHOPEE_PARTNER_KEY", "")
-    SHOPEE_SHOP_ID = int(os.environ.get("SHOPEE_SHOP_ID", "0"))
+# STEP 3: Read TikTok Shop API credentials.
+# We keep these as strings because API ids can be large and signatures are
+# string-based anyway.
+if USE_FAKE_TIKTOKSHOP:
+    TIKTOKSHOP_APP_KEY = os.environ.get("TIKTOKSHOP_APP_KEY", "")
+    TIKTOKSHOP_APP_SECRET = os.environ.get("TIKTOKSHOP_APP_SECRET", "")
+    TIKTOKSHOP_SHOP_ID = os.environ.get("TIKTOKSHOP_SHOP_ID", "")
 else:
-    SHOPEE_PARTNER_ID = int(os.environ["SHOPEE_PARTNER_ID"])
-    SHOPEE_PARTNER_KEY = os.environ["SHOPEE_PARTNER_KEY"]
-    SHOPEE_SHOP_ID = int(os.environ["SHOPEE_SHOP_ID"])
+    TIKTOKSHOP_APP_KEY = os.environ["TIKTOKSHOP_APP_KEY"]
+    TIKTOKSHOP_APP_SECRET = os.environ["TIKTOKSHOP_APP_SECRET"]
+    TIKTOKSHOP_SHOP_ID = os.environ["TIKTOKSHOP_SHOP_ID"]
 
 
 # STEP 4: Read Telegram bot credentials.
@@ -67,15 +63,9 @@ TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 # STEP 5: Define constants that control behavior.
 # File paths are anchored to PROJECT_ROOT so they always resolve to the same
 # place regardless of where Python was launched from.
-SHOPEE_API_BASE_URL = "https://partner.shopeemobile.com"
-
-# STEP 6: General processed-order state file used by this bot.
+TIKTOKSHOP_API_BASE_URL = "https://open-api.tiktokglobalshop.com"
 STATE_FILE_PATH = str(PROJECT_ROOT / "data" / "processed_orders.json")
-
-# STEP 7: Temporary: still Shopee-specific until auth migration.
-TOKENS_FILE_PATH = str(PROJECT_ROOT / "data" / "shopee_tokens.json")
-
-# STEP 8: Runtime safety and formatting settings.
+TOKENS_FILE_PATH = str(PROJECT_ROOT / "data" / "tiktokshop_tokens.json")
 MAX_ORDERS_PER_RUN = 30  # Safety cap. If we see more than this, something is wrong.
 LABEL_IMAGE_DPI = 200    # Resolution for PDF -> PNG conversion.
 STATE_RETENTION_DAYS = 30  # How long to remember processed orders before pruning.
