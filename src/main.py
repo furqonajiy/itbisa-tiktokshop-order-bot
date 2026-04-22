@@ -5,14 +5,15 @@ The entry point. Run this file to do one full processing cycle.
 
 What this script does, in order:
   1. Load the list of order IDs we already processed.
-  2. Ask Shopee for orders in READY_TO_SHIP or PROCESSED status.
+  2. Ask TikTok Shop for orders in AWAITING_SHIPMENT or AWAITING_COLLECTION.
   3. Filter out the ones we already handled.
   4. Stop if there are too many (safety check).
   5. For each new order:
-     a. If READY_TO_SHIP, call ship_order_to_dropoff to arrange shipment
-        (equivalent to clicking "Atur Pengiriman" -> "Antar ke Counter"
-        in the Shopee Seller app). This moves the order to PROCESSED.
-     b. Fetch the shipping label PDF (with retries while Shopee generates it).
+     a. If AWAITING_SHIPMENT, call ship_order() to mark it ready to ship.
+        This moves the order to AWAITING_COLLECTION and triggers label
+        availability.
+     b. Fetch the shipping label PDF (with retries while TikTok Shop makes
+        it available).
      c. Convert PDF to PNG, send to Telegram, mark as processed only AFTER
         Telegram confirms delivery.
   6. Save the updated state file so future runs remember.
@@ -23,15 +24,15 @@ The GitHub Actions workflow runs this script on a schedule.
 """
 
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src import (
     config,
-    shopee_client,
-    shopee_auth,
     label_processor,
-    telegram_sender,
     state_manager,
+    telegram_sender,
+    tiktokshop_auth,
+    tiktokshop_client,
 )
 
 
@@ -39,31 +40,30 @@ from src import (
 JAKARTA_TZ = timezone(timedelta(hours=7))
 
 
+
 def _now_jakarta_hhmm():
     """Returns the current time in Jakarta as a HH:MM string."""
     return datetime.now(JAKARTA_TZ).strftime("%H:%M")
+
 
 
 def run():
     """Runs one full cycle. Returns nothing. Prints progress to stdout."""
 
     print("=" * 60)
-    print("ITBisa Tiktok Shop Order Bot - starting run")
+    print("ITBisa TikTok Shop Order Bot - starting run")
     print("=" * 60)
 
     # STEP 0: Wrap the whole run in a try block so we can catch the one
     # error that requires a human response: an expired refresh_token.
-    # Any other error is allowed to bubble up and fail the GitHub Actions
-    # run, which is the right behavior for unexpected problems.
     try:
         _do_run()
-    except shopee_auth.RefreshTokenExpiredError as e:
-        # This happens roughly once every 30 days. The bot cannot recover
-        # on its own, so we notify the shop owner via Telegram and exit.
+    except tiktokshop_auth.RefreshTokenExpiredError as e:
+        # This case needs human attention because the bot cannot recover by itself.
         alert = (
-            f"🔐 {_now_jakarta_hhmm()} - Otorisasi Shopee kadaluarsa. "
-            f"Mohon otorisasi ulang aplikasi di Shopee Open Platform Console, "
-            f"lalu update file data/shopee_tokens.json dengan token baru."
+            f"🔐 {_now_jakarta_hhmm()} - Otorisasi TikTok Shop kadaluarsa. "
+            f"Mohon otorisasi ulang aplikasi di TikTok Shop Open Platform, "
+            f"lalu update file data/tiktokshop_tokens.json dengan token baru."
         )
         telegram_sender.send_summary(alert)
         print(f"\n{alert}")
@@ -71,32 +71,29 @@ def run():
         sys.exit(1)
 
 
+
 def _do_run():
     """The actual run logic. Separated so run() can wrap it in error handling."""
 
     # STEP 1: Load the dictionary of orders we already processed.
     processed = state_manager.load()
-    print(f"Loaded Tiktok Shop state: {len(processed)} previously processed orders remembered")
+    print(f"Loaded state: {len(processed)} previously processed orders remembered")
 
-    # STEP 2: Fetch all orders that need a label printed. This includes both
-    # READY_TO_SHIP (need shipment arrangement first) and PROCESSED (label
-    # is being generated or ready). The token will be refreshed automatically
-    # by shopee_client if needed.
-    print("Fetching pending orders from Shopee...")
-    orders = shopee_client.get_pending_orders()
-    print(f"Shopee returned {len(orders)} pending orders")
+    # STEP 2: Fetch all orders that need a label printed.
+    print("Fetching pending orders from TikTok Shop...")
+    orders = tiktokshop_client.get_pending_orders()
+    print(f"TikTok Shop returned {len(orders)} pending orders")
 
     # STEP 3: Filter out orders we already processed in a previous run,
-    # then sort them by order_sn ascending so Telegram receives labels in a
+    # then sort them by order_id ascending so Telegram receives labels in a
     # stable oldest-to-newest order.
     new_orders = sorted(
-        (o for o in orders if o["order_sn"] not in processed),
-        key=lambda o: str(o["order_sn"]),
+        (o for o in orders if o["order_id"] not in processed),
+        key=lambda o: str(o["order_id"]),
     )
     print(f"Of those, {len(new_orders)} are new and need processing")
 
     # STEP 4: If there are no new orders, send a heartbeat and exit.
-    # We still send a message so the employee knows the bot is healthy.
     if not new_orders:
         summary = telegram_sender.build_summary(_now_jakarta_hhmm(), 0, 0)
         telegram_sender.send_summary(summary)
@@ -118,32 +115,28 @@ def _do_run():
     success_count = 0
     skipped_count = 0
     for order in new_orders:
-        order_sn = order["order_sn"]
+        order_id = order["order_id"]
         order_status = order.get("order_status", "UNKNOWN")
-        print(f"\nProcessing order {order_sn} (status: {order_status})...")
+        print(f"\nProcessing order {order_id} (status: {order_status})...")
 
-        # STEP 6a: If the order is still in READY_TO_SHIP, we need to tell
-        # Shopee to arrange shipment first. We always use dropoff because
-        # the warehouse drops packages at the courier counter at end of day.
-        # After this call, the order moves to PROCESSED and Shopee starts
-        # generating the shipping label.
-        if order_status == "READY_TO_SHIP":
+        # STEP 6a: If the order is still awaiting shipment, tell TikTok Shop
+        # the order is ready to ship first. After that, the label should become
+        # available for download.
+        if order_status == "AWAITING_SHIPMENT":
             try:
-                print(f"  Arranging dropoff shipment for {order_sn}...")
-                shopee_client.ship_order_to_dropoff(order_sn)
-                print(f"  Shipment arranged. Label generation will start.")
+                print(f"  Marking {order_id} as ready to ship...")
+                tiktokshop_client.ship_order(order_id)
+                print("  Ready-to-ship succeeded. Label should be available soon.")
             except Exception as e:
-                print(f"  ✗ Failed to arrange shipment for {order_sn}: {e}")
-                print(f"    Will retry next run.")
+                print(f"  ✗ Failed to mark {order_id} ready to ship: {e}")
+                print("    Will retry next run.")
                 skipped_count += 1
                 continue
 
-        # STEP 6b: Get the shipping label PDF from Shopee. The retry logic
-        # inside get_shipping_label_pdf handles the case where Shopee is
-        # still generating the label when we ask for it.
-        pdf_bytes = shopee_client.get_shipping_label_pdf(order_sn)
+        # STEP 6b: Get the shipping label PDF from TikTok Shop.
+        pdf_bytes = tiktokshop_client.get_shipping_label_pdf(order_id)
         if pdf_bytes is None:
-            print(f"  Skipping {order_sn} (label not ready). Will retry next run.")
+            print(f"  Skipping {order_id} (label not ready). Will retry next run.")
             skipped_count += 1
             continue
 
@@ -156,19 +149,17 @@ def _do_run():
         delivered = telegram_sender.send_label(png_pages, caption)
 
         # STEP 6e: Only mark as processed if Telegram confirmed delivery.
-        # This is the safety rule: if Telegram fails, we want the next run
-        # to retry this order, not silently skip it forever.
         if delivered:
-            processed[order_sn] = state_manager.now_iso()
+            processed[order_id] = state_manager.now_iso()
             success_count += 1
-            print(f"  ✓ Sent to Telegram and marked as processed")
+            print("  ✓ Sent to Telegram and marked as processed")
         else:
-            print(f"  ✗ Telegram delivery failed. Will retry next run.")
+            print("  ✗ Telegram delivery failed. Will retry next run.")
             skipped_count += 1
 
     # STEP 7: Save the updated state file so the next run remembers what we did.
     state_manager.save(processed)
-    print(f"\nState saved.")
+    print("\nState saved.")
 
     # STEP 8: Send a summary heartbeat so the employee knows what happened.
     summary = telegram_sender.build_summary(
