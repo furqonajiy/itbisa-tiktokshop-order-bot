@@ -4,11 +4,17 @@ get_chiper_code.py
 Fetches the authorized shops list from TikTok Shop and prints the full
 response body so we can see the shop cipher code.
 
-Why this script exists:
-  After the OAuth/token bootstrap, TikTok Shop gives us an access token,
-  but some shop-level APIs want the shop "cipher" value. This script calls
-  the authorized shops endpoint, prints the raw body for debugging, and then
-  highlights the matching shop based on TIKTOKSHOP_SHOP_ID.
+This version matches the confirmed working curl shape:
+  GET /authorization/202309/shops
+  query params:
+    - access_token
+    - app_key
+    - shop_id
+    - sign
+    - timestamp
+    - version
+  header:
+    - x-tts-access-token
 
 How to use it:
   1. Make sure these environment variables are set:
@@ -38,8 +44,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src import config
 
 
-# TikTok Shop's authorized shops endpoint lives on the open-api host,
-# not the auth host used during token bootstrap.
+# STEP 0: This endpoint uses the TikTok Shop open-api host.
 _OPEN_API_BASE_URL = "https://open-api.tiktokglobalshop.com"
 
 
@@ -53,48 +58,54 @@ def main():
     print(f"Target Shop ID: {config.TIKTOKSHOP_SHOP_ID}")
     print()
 
-    # STEP 1: Load the access token from the existing tokens file.
+    # STEP 1: Load the access token from the tokens file.
     access_token = _load_access_token()
     print(f"Loaded access token from {config.TOKENS_FILE_PATH}")
 
-    # STEP 2: Build the signed request exactly as TikTok Shop expects.
+    # STEP 2: Build the request params exactly like the confirmed curl.
     path = "/authorization/202309/shops"
     timestamp = str(int(time.time()))
 
-    # Important: build the signature using ONLY app_key, timestamp, and version.
-    # The access_token is added AFTER the signature is computed.
+    # Important:
+    # This request shape includes shop_id in the signed query.
     params_for_sign = {
         "app_key": config.TIKTOKSHOP_APP_KEY,
+        "shop_id": str(config.TIKTOKSHOP_SHOP_ID),
         "timestamp": timestamp,
         "version": "202309",
     }
+
     sign = _make_signature(path=path, params=params_for_sign)
 
-    # STEP 3: Add the remaining request parameters used in the actual call.
+    # STEP 3: Add the remaining params used in the actual GET request.
     request_params = {
-        **params_for_sign,
         "access_token": access_token,
+        **params_for_sign,
         "sign": sign,
     }
 
     url = f"{_OPEN_API_BASE_URL}{path}"
     headers = {
         "x-tts-access-token": access_token,
-        "content-type": "application/json",
     }
 
     print(f"Calling {path} ...")
     print(f"GET {url}?{urlencode(request_params)}")
 
     # STEP 4: Call the endpoint.
-    response = requests.get(url, params=request_params, headers=headers, timeout=30)
+    response = requests.get(
+        url,
+        params=request_params,
+        headers=headers,
+        timeout=30,
+    )
     print(f"HTTP status: {response.status_code}")
 
-    # STEP 5: Show the raw response body exactly as returned by TikTok Shop.
+    # STEP 5: Print the raw response body exactly as requested.
     print("\nRaw response body:")
     print(response.text)
 
-    # STEP 6: Try to parse JSON so we can also highlight the matching shop.
+    # STEP 6: Parse JSON so we can also show the matching shop cleanly.
     try:
         data = response.json()
     except ValueError:
@@ -110,7 +121,7 @@ def main():
         print(json.dumps(data, indent=2, ensure_ascii=False))
         sys.exit(1)
 
-    # STEP 7: Extract shops and look for the configured shop_id.
+    # STEP 7: Extract the shops list and find the configured shop.
     shops = data.get("data", {}).get("shops", [])
     if not shops:
         print("\nNo shops found in response.")
@@ -128,15 +139,13 @@ def main():
         None,
     )
 
-    # STEP 8: Print the most useful final result.
+    # STEP 8: Print the final matched result.
     if matching_shop:
         print("\nMatched shop:")
         print(json.dumps(matching_shop, indent=2, ensure_ascii=False))
         print(f"\nCipher code for shop {config.TIKTOKSHOP_SHOP_ID}: {matching_shop.get('cipher')}")
     else:
-        print(
-            "\nConfigured TIKTOKSHOP_SHOP_ID was not found in the authorized shops list."
-        )
+        print("\nConfigured TIKTOKSHOP_SHOP_ID was not found in the authorized shops list.")
         print("Check whether the correct shop was authorized for this access token.")
 
 
@@ -144,7 +153,7 @@ def _load_access_token():
     """
     Loads the access token from data/tiktokshop_tokens.json.
 
-    Supports both of these shapes just in case:
+    Supports both:
       1. {"access_token": "..."}
       2. {"data": {"access_token": "..."}}
     """
@@ -158,12 +167,12 @@ def _load_access_token():
     with open(tokens_path, "r", encoding="utf-8") as f:
         token_data = json.load(f)
 
-    # STEP 1: Prefer the flat structure used by this repo's bootstrap script.
+    # STEP 1: Prefer the flat structure used by this repo.
     access_token = token_data.get("access_token")
     if access_token:
         return access_token
 
-    # STEP 2: Fall back to nested structure if the file came from another tool.
+    # STEP 2: Fall back to nested structure if needed.
     nested_access_token = token_data.get("data", {}).get("access_token")
     if nested_access_token:
         return nested_access_token
@@ -173,22 +182,23 @@ def _load_access_token():
 
 def _make_signature(path, params):
     """
-    Builds TikTok Shop's signature for /authorization/202309/shops.
+    Builds the TikTok Shop signature for the authorized shops endpoint.
 
-    The string-to-sign format is:
-      app_secret + path + concatenated(sorted_query_params) + app_secret
+    This version matches the confirmed curl shape where the signed query
+    includes:
+      - app_key
+      - shop_id
+      - timestamp
+      - version
 
-    Then that string is HMAC-SHA256 signed using app_secret as the key,
-    and encoded as lowercase hex.
-
-    Important:
-      access_token is NOT included in this signature for this endpoint.
+    The access_token is sent in the request, but is not included in the
+    signature input here.
     """
 
-    # STEP 1: Sort query parameters by name, ascending, case sensitive.
+    # STEP 1: Sort query params by key ascending.
     sorted_items = sorted(params.items(), key=lambda item: item[0])
 
-    # STEP 2: Build the exact string TikTok Shop expects.
+    # STEP 2: Build the string to sign.
     parts = [config.TIKTOKSHOP_APP_SECRET, path]
     for key, value in sorted_items:
         parts.append(str(key))
