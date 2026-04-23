@@ -63,7 +63,7 @@ TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 # STEP 5: Define constants that control behavior.
 # File paths are anchored to PROJECT_ROOT so they always resolve to the same
 # place regardless of where Python was launched from.
-TIKTOKSHOP_API_BASE_URL = "https://open-api.tiktokglobalshop.com"
+TIKTOKSHOP_AUTH_BASE_URL = "https://auth.tiktok-shops.com"
 STATE_FILE_PATH = str(PROJECT_ROOT / "data" / "processed_orders.json")
 TOKENS_FILE_PATH = str(PROJECT_ROOT / "data" / "tiktokshop_tokens.json")
 MAX_ORDERS_PER_RUN = 30  # Safety cap. If we see more than this, something is wrong.
