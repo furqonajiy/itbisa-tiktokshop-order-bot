@@ -5,7 +5,7 @@ One-time script to seed data/tiktokshop_tokens.json with initial tokens.
 
 When to run this:
   - The very first time you set up the bot.
-  - After the refresh_token expires and you need to re-authorize.
+  - After the refresh_token expires, and you need to re-authorize.
   - When switching apps or environments.
 
 How to use it:
