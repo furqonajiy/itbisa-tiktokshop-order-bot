@@ -18,7 +18,7 @@ How to use it:
 
 import json
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -30,7 +30,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src import config
 
 
-
 def main():
     """Interactive bootstrap flow."""
 
@@ -39,7 +38,6 @@ def main():
     print("=" * 60)
     print(f"Target environment: {config.TIKTOKSHOP_AUTH_BASE_URL}")
     print(f"App Key: {config.TIKTOKSHOP_APP_KEY}")
-    print(f"Shop ID: {config.TIKTOKSHOP_SHOP_ID}")
     print()
 
     # STEP 1: Prompt for the authorization code.
@@ -48,8 +46,7 @@ def main():
         print("No auth_code provided. Aborting.")
         sys.exit(1)
 
-    # STEP 2: Build the request param exactly as the public TikTok Shop Open API
-    # collection expects it.
+    # STEP 2: Build the request exactly as TikTok Shop expects it.
     path = "/api/v2/token/get"
     url = f"{config.TIKTOKSHOP_AUTH_BASE_URL}{path}"
     params = {
@@ -63,70 +60,66 @@ def main():
     print(f"\nCalling {path}...")
     response = requests.get(url, params=params, timeout=30)
     print(f"Status: {response.status_code}")
-    data = _safe_json(response)
 
-    # STEP 4: Check for errors.
-    if response.status_code != 200 or _has_api_error(data):
+    try:
+        data = response.json()
+    except ValueError:
+        print("\nTikTok Shop did not return valid JSON:")
+        print(response.text)
+        sys.exit(1)
+
+    # STEP 4: Check for HTTP or API errors.
+    if response.status_code != 200 or data.get("code") not in (0, "0"):
         print("\nTikTok Shop rejected the request:")
         print(json.dumps(data, indent=2, ensure_ascii=False))
         sys.exit(1)
 
-    # STEP 5: Extract the tokens and compute the absolute expiry timestamp.
-    payload = _extract_payload(data)
-    access_token = payload["access_token"]
-    refresh_token = payload["refresh_token"]
-    expire_in_seconds = int(
-        payload.get("access_token_expire_in")
-        or payload.get("expire_in")
-        or payload.get("expires_in")
-        or 0
-    )
-    if expire_in_seconds <= 0:
-        expires_at = datetime.now(timezone.utc)
-    else:
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expire_in_seconds)
+    # STEP 5: Extract the payload from the response.
+    payload = data.get("data", {})
+    access_token = payload.get("access_token")
+    refresh_token = payload.get("refresh_token")
+    access_token_expire_in = payload.get("access_token_expire_in")
+    refresh_token_expire_in = payload.get("refresh_token_expire_in")
+
+    if not access_token or not refresh_token:
+        print("\nTikTok Shop response is missing tokens:")
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+        sys.exit(1)
+
+    # STEP 6: Convert TikTok Shop expiry timestamps into ISO format.
+    # In the real response, these values are Unix timestamps, not durations.
+    access_token_expires_at = _unix_to_iso(access_token_expire_in)
+    refresh_token_expires_at = _unix_to_iso(refresh_token_expire_in)
 
     tokens = {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "access_token_expires_at": expires_at.isoformat(),
+        "access_token_expires_at": access_token_expires_at,
+        "refresh_token_expires_at": refresh_token_expires_at,
     }
 
-    # STEP 6: Write the tokens file.
+    # STEP 7: Write the tokens file.
     tokens_path = Path(config.TOKENS_FILE_PATH)
     tokens_path.parent.mkdir(parents=True, exist_ok=True)
+
     with open(tokens_path, "w", encoding="utf-8") as f:
         json.dump(tokens, f, indent=2, sort_keys=True)
 
     print(f"\n✓ Wrote tokens to {tokens_path}")
     print(f"  access_token:  {access_token[:12]}... (truncated)")
     print(f"  refresh_token: {refresh_token[:12]}... (truncated)")
-    print(f"  expires at:    {expires_at.isoformat()}")
+    print(f"  access_token_expires_at:  {access_token_expires_at}")
+    print(f"  refresh_token_expires_at: {refresh_token_expires_at}")
 
 
+def _unix_to_iso(value):
+    """
+    Converts a Unix timestamp in seconds to ISO 8601 UTC string.
 
-def _safe_json(response):
-    try:
-        return response.json()
-    except ValueError:
-        return {}
-
-
-
-def _has_api_error(data):
-    code = data.get("code")
-    if code in (None, 0, "0"):
-        return False
-    return True
-
-
-
-def _extract_payload(data):
-    if isinstance(data.get("data"), dict):
-        return data["data"]
-    if isinstance(data.get("response"), dict):
-        return data["response"]
-    return data
+    Example:
+      1777539662 -> 2026-04-29T...
+    """
+    return datetime.fromtimestamp(int(value), tz=timezone.utc).isoformat()
 
 
 if __name__ == "__main__":
