@@ -181,7 +181,7 @@ def _refresh_tokens(refresh_token):
     # STEP 1: Build the request body exactly as the public TikTok Shop Open API
     # collection expects it.
     path = "/api/token/refreshToken"
-    url = f"{config.TIKTOKSHOP_API_BASE_URL}{path}"
+    url = f"{config.TIKTOKSHOP_AUTH_BASE_URL}{path}"
     body = {
         "app_key": config.TIKTOKSHOP_APP_KEY,
         "app_secret": config.TIKTOKSHOP_APP_SECRET,

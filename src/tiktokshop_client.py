@@ -120,7 +120,7 @@ def _build_signed_request(path, body=None, extra_params=None):
     params["sign"] = _make_signature(path=path, params=params, body=body)
 
     # STEP 5: Build the full URL.
-    url = f"{config.TIKTOKSHOP_API_BASE_URL}{path}"
+    url = f"{config.TIKTOKSHOP_AUTH_BASE_URL}{path}"
     return url, params
 
 

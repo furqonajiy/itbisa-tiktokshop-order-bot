@@ -37,7 +37,7 @@ def main():
     print("=" * 60)
     print("TikTok Shop Tokens Bootstrap")
     print("=" * 60)
-    print(f"Target environment: {config.TIKTOKSHOP_API_BASE_URL}")
+    print(f"Target environment: {config.TIKTOKSHOP_AUTH_BASE_URL}")
     print(f"App Key: {config.TIKTOKSHOP_APP_KEY}")
     print(f"Shop ID: {config.TIKTOKSHOP_SHOP_ID}")
     print()
@@ -48,20 +48,20 @@ def main():
         print("No auth_code provided. Aborting.")
         sys.exit(1)
 
-    # STEP 2: Build the request body exactly as the public TikTok Shop Open API
+    # STEP 2: Build the request param exactly as the public TikTok Shop Open API
     # collection expects it.
-    path = "/api/token/getAccessToken"
-    url = f"{config.TIKTOKSHOP_API_BASE_URL}{path}"
-    body = {
+    path = "/api/v2/token/get"
+    url = f"{config.TIKTOKSHOP_AUTH_BASE_URL}{path}"
+    params = {
         "app_key": config.TIKTOKSHOP_APP_KEY,
         "app_secret": config.TIKTOKSHOP_APP_SECRET,
-        "grant_type": "authorized_code",
         "auth_code": auth_code,
+        "grant_type": "authorized_code",
     }
 
     # STEP 3: Call the endpoint.
     print(f"\nCalling {path}...")
-    response = requests.post(url, json=body, timeout=30)
+    response = requests.get(url, params=params, timeout=30)
     print(f"Status: {response.status_code}")
     data = _safe_json(response)
 
