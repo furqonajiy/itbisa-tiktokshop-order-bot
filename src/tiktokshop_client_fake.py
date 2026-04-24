@@ -2,17 +2,17 @@
 tiktokshop_client_fake.py
 -------------------------
 Fake replacement for tiktokshop_client.py. Used only during local development
-when the real TikTok Shop API is not accessible.
+when real TikTok Shop API access is not available.
 
-Why this file exists:
-  We want to test the full pipeline (fetch orders -> get label -> convert to
-  PNG -> send to Telegram) without depending on the real TikTok Shop API.
-  This file provides the same public functions as tiktokshop_client.py,
-  but returns canned data and generates dummy PDF labels in memory.
+The orders here follow the real TikTok Shop response shape:
+  - top-level order.id
+  - order.order_status ("AWAITING_SHIPMENT" or "AWAITING_COLLECTION")
+  - order.packages = [{"id": "..."}]
+  - order.line_items = [{seller_sku, product_name, quantity, shipping_provider_name}]
 
-How to use it:
-  Set USE_FAKE_TIKTOKSHOP=true in your .env file. The dispatcher in
-  tiktokshop_client.py will route calls here automatically.
+That lets main.py, tiktokshop_client.ship_packages, and
+telegram_sender.build_caption exercise the exact same code paths as
+production, just with no network calls.
 """
 
 import io
@@ -23,63 +23,60 @@ from reportlab.pdfgen import canvas
 
 
 # ============================================================
-# Canned fake orders.
+# Canned fake orders
 # ============================================================
 
 _FAKE_ORDERS = [
     {
-        "order_id": "576461413038785750",
-        "order_status": "AWAITING_COLLECTION",  # Already marked RTS, label is ready
-        "shipping_carrier": "TikTok Shipping",
-        "item_list": [
+        "id": "576461413038785750",
+        "order_status": "AWAITING_COLLECTION",
+        "packages": [{"id": "1193892791888217574"}],
+        "line_items": [
             {
-                "item_name": "ITBisa - Socket IC DIP 16 Pin 2.54mm Narrow 2x8",
-                "item_sku": "ITBISA-SOCKET-IC-DIP16-NARROW",
-                "model_name": "",
-                "model_sku": "ITBISA-SOCKET-IC-DIP16-NARROW",
-                "model_quantity_purchased": 10,
+                "seller_sku": "ITBISA-SOCKET-IC-DIP16-NARROW",
+                "product_name": "ITBisa - Socket IC DIP 16 Pin 2.54mm Narrow",
+                "quantity": 10,
+                "shipping_provider_name": "JNT Express",
             }
         ],
     },
     {
-        "order_id": "576461413038785751",
-        "order_status": "AWAITING_SHIPMENT",  # Needs ship_order first
-        "shipping_carrier": "TikTok Shipping",
-        "item_list": [
+        "id": "576461413038785751",
+        "order_status": "AWAITING_SHIPMENT",
+        "packages": [{"id": "1193892791888217575"}],
+        "line_items": [
             {
-                "item_name": "ITBisa - LED Super Bright 5mm All Color",
-                "item_sku": "ITBISA-LED-SUPERBRIGHT-5MM-RED",
-                "model_name": "Red",
-                "model_sku": "ITBISA-LED-SUPERBRIGHT-5MM-RED",
-                "model_quantity_purchased": 20,
+                "seller_sku": "ITBISA-LED-SUPERBRIGHT-5MM-RED",
+                "product_name": "ITBisa - LED Super Bright 5mm Red",
+                "quantity": 20,
+                "shipping_provider_name": "SPX Express",
             },
             {
-                "item_name": "ITBisa - LED Super Bright 5mm All Color",
-                "item_sku": "ITBISA-LED-SUPERBRIGHT-5MM-GREEN",
-                "model_name": "Green",
-                "model_sku": "ITBISA-LED-SUPERBRIGHT-5MM-GREEN",
-                "model_quantity_purchased": 15,
+                "seller_sku": "ITBISA-LED-SUPERBRIGHT-5MM-GREEN",
+                "product_name": "ITBisa - LED Super Bright 5mm Green",
+                "quantity": 15,
+                "shipping_provider_name": "SPX Express",
             },
         ],
     },
     {
-        "order_id": "576461413038785752",
-        "order_status": "AWAITING_SHIPMENT",  # Needs ship_order first
-        "shipping_carrier": "TikTok Shipping",
-        "item_list": [
+        "id": "576461413038785752",
+        "order_status": "AWAITING_SHIPMENT",
+        "packages": [{"id": "1193892791888217576"}],
+        "line_items": [
             {
-                "item_name": "ITBisa - Resistor Pack 1/4W 1% Toleransi 100 Nilai",
-                "item_sku": "ITBISA-RES-PACK-100",
-                "model_name": "",
-                "model_sku": "ITBISA-RES-PACK-100",
-                "model_quantity_purchased": 1,
+                "seller_sku": "ITBISA-RES-PACK-100",
+                "product_name": "ITBisa - Resistor Pack 100 values",
+                "quantity": 1,
+                "shipping_provider_name": "J&T Express",
             }
         ],
     },
 ]
 
 
-# Tracks which fake orders have been "shipped" during this run.
+# Tracks which fake packages have been "shipped" during this run so the
+# fake waybill endpoint can behave realistically.
 _shipped_in_this_run = set()
 
 
@@ -88,71 +85,73 @@ _shipped_in_this_run = set()
 # ============================================================
 
 def get_pending_orders():
-    """Returns the canned list of fake orders."""
-
-    # STEP 1: Print a clear marker so we never confuse fake runs with real ones.
+    """Returns the canned list of fake orders (shallow-copied)."""
     print(f"  [FAKE MODE] Returning {len(_FAKE_ORDERS)} canned fake TikTok Shop orders")
-
-    # STEP 2: Return a shallow copy so callers do not mutate our source list.
     return [dict(order) for order in _FAKE_ORDERS]
 
 
+def ship_packages(package_ids):
+    """Simulates Batch Ship Packages by tagging ids as 'shipped this run'."""
+    for package_id in package_ids:
+        _shipped_in_this_run.add(str(package_id))
+    print(f"  [FAKE MODE] Batch-shipped {len(package_ids)} package(s)")
 
-def ship_order(order_id):
+
+def get_waybill_pdf(package_id):
     """
-    Simulates calling TikTok Shop's ready-to-ship endpoint.
+    Returns a dummy PDF for an already-shipped package, else None.
 
-    In real TikTok Shop, this would move the order from AWAITING_SHIPMENT to
-    AWAITING_COLLECTION and trigger label availability. In our fake, we just
-    record that this order has been marked ready to ship.
-    """
-
-    # STEP 1: Verify the order exists in our fake data.
-    order = next((o for o in _FAKE_ORDERS if o["order_id"] == order_id), None)
-    if order is None:
-        raise ValueError(f"[FAKE MODE] Unknown order_id: {order_id}")
-
-    # STEP 2: Mark it as shipped in our in-memory state.
-    _shipped_in_this_run.add(order_id)
-    print(f"  [FAKE MODE] Marked {order_id} as ready to ship")
-
-
-
-def get_shipping_label_pdf(order_id):
-    """
-    Generates a dummy PDF that looks roughly like a shipping label.
-
-    For AWAITING_SHIPMENT orders, the label is only available AFTER
-    ship_order has been called. For AWAITING_COLLECTION orders, the label
-    is available immediately.
+    Mirrors the real behavior: packages from AWAITING_SHIPMENT orders only
+    have waybills AFTER ship_packages has been called for them; packages
+    from AWAITING_COLLECTION orders always have waybills available.
     """
 
-    # STEP 1: Look up the order in our canned data.
-    order = next((o for o in _FAKE_ORDERS if o["order_id"] == order_id), None)
-    if order is None:
-        print(f"  [FAKE MODE] Unknown order_id: {order_id}")
+    # STEP 1: Find the source order and check package existence.
+    source_order = _find_source_order(package_id)
+    if source_order is None:
+        print(f"  [FAKE MODE] Unknown package_id: {package_id}")
         return None
 
-    # STEP 2: Check if the label is actually available yet.
-    if order["order_status"] == "AWAITING_SHIPMENT" and order_id not in _shipped_in_this_run:
-        print(f"  [FAKE MODE] {order_id} not ready-to-ship yet, label unavailable")
+    # STEP 2: Gate waybill availability on whether the package was shipped
+    # this run (if the source order was AWAITING_SHIPMENT).
+    status = source_order.get("order_status")
+    if status == "AWAITING_SHIPMENT" and str(package_id) not in _shipped_in_this_run:
+        print(f"  [FAKE MODE] Package {package_id} not shipped yet, waybill unavailable")
         return None
 
-    print(f"  [FAKE MODE] Generating dummy PDF for {order_id}")
+    # STEP 3: Generate a small realistic-looking PDF.
+    print(f"  [FAKE MODE] Generating dummy waybill PDF for package {package_id}")
+    return _generate_dummy_pdf(source_order, str(package_id))
 
-    # STEP 3: Create an in-memory PDF using reportlab.
+
+# ============================================================
+# Internal helpers
+# ============================================================
+
+def _find_source_order(package_id):
+    """Finds the order whose packages contain the given package id."""
+    for order in _FAKE_ORDERS:
+        for package in order.get("packages", []):
+            if str(package.get("id")) == str(package_id):
+                return order
+    return None
+
+
+def _generate_dummy_pdf(order, package_id):
+    """Renders a tiny A6 PDF in memory so the Telegram side has real bytes."""
+
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A6)
     width, height = A6
 
-    # STEP 4: Draw a header bar at the top.
+    # STEP 1: Header bar.
     pdf.setFillColorRGB(0.00, 0.00, 0.00)
     pdf.rect(0, height - 40, width, 40, fill=1, stroke=0)
     pdf.setFillColorRGB(1, 1, 1)
-    pdf.setFont("Helvetica-Bold", 14)
-    pdf.drawString(15, height - 27, "ITBisa - TikTok Label (FAKE)")
+    pdf.setFont("Helvetica-Bold", 13)
+    pdf.drawString(15, height - 27, "ITBisa - TikTok Waybill (FAKE)")
 
-    # STEP 5: Draw order details.
+    # STEP 2: Order and package info.
     pdf.setFillColorRGB(0, 0, 0)
     y = height - 65
     line_height = 14
@@ -160,35 +159,34 @@ def get_shipping_label_pdf(order_id):
     pdf.setFont("Helvetica-Bold", 10)
     pdf.drawString(15, y, "Order ID:")
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(15, y - line_height, order["order_id"])
-    y -= line_height * 2 + 8
+    pdf.drawString(15, y - line_height, str(order.get("id", "?")))
+    y -= line_height * 2 + 4
 
     pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(15, y, "Kurir:")
+    pdf.drawString(15, y, "Package ID:")
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(15, y - line_height, order["shipping_carrier"])
+    pdf.drawString(15, y - line_height, package_id)
     y -= line_height * 2 + 8
 
-    # STEP 6: Draw the items.
+    # STEP 3: Items.
     pdf.setFont("Helvetica-Bold", 10)
     pdf.drawString(15, y, "Barang:")
     y -= line_height
     pdf.setFont("Helvetica", 8)
-    for item in order["item_list"]:
-        line = f"{item['model_quantity_purchased']} x {item['model_sku']}"
+    for item in order.get("line_items", []):
+        line = f"{item.get('quantity', 1)} x {item.get('seller_sku', '?')}"
         pdf.drawString(15, y, line)
         y -= line_height - 2
-
     y -= 8
 
-    # STEP 7: Draw a fake barcode area.
+    # STEP 4: Fake barcode strip.
     pdf.setFillColorRGB(0, 0, 0)
     pdf.rect(15, y - 50, width - 30, 40, fill=1, stroke=0)
     pdf.setFillColorRGB(1, 1, 1)
     pdf.setFont("Helvetica", 8)
-    pdf.drawCentredString(width / 2, y - 33, f"|||| {order['order_id']} ||||")
+    pdf.drawCentredString(width / 2, y - 33, f"|||| {package_id} ||||")
 
-    # STEP 8: Footer with timestamp so we can verify the PDF was freshly generated.
+    # STEP 5: Footer timestamp so we can eyeball PDF freshness.
     pdf.setFillColorRGB(0.5, 0.5, 0.5)
     pdf.setFont("Helvetica-Oblique", 7)
     pdf.drawString(
@@ -197,7 +195,6 @@ def get_shipping_label_pdf(order_id):
         f"Generated: {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
     )
 
-    # STEP 9: Finalize the PDF and return its bytes.
     pdf.showPage()
     pdf.save()
     return buffer.getvalue()

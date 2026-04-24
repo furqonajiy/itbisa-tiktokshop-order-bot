@@ -1,15 +1,20 @@
 """
 telegram_sender.py
 ------------------
-Sends shipping label images to the Telegram bot.
-
-Why this file exists:
-  The employee receives notifications via Telegram and prints the labels from
-  there. This module is the only place that knows about the Telegram API.
+Sends shipping label (waybill) images to the Telegram bot.
 
 Public functions (used by main.py):
-  - send_label(png_bytes, caption) -> True if delivered, False otherwise
-  - build_caption(order) -> formatted string with order info
+  - send_label(png_bytes_or_pages, caption) -> True/False
+  - send_summary(text) -> True/False
+  - build_caption(order) -> string
+  - build_summary(time_hhmm, success_count, skipped_count) -> string
+  - build_safety_stop_message(time_hhmm, order_count, max_allowed) -> string
+
+Caption rules (follow process_waybill.py):
+  - order id comes from id / order_id / orderId
+  - courier comes ONLY from item-level shipping_provider_name fields
+  - items are grouped by SKU; repeated SKUs are summed
+  - if multiple item-level couriers exist, courier is appended to each line
 """
 
 import requests
@@ -17,30 +22,28 @@ import requests
 from src import config
 
 
-# The Telegram Bot API base URL. We compose the full endpoint from this.
+# The Telegram Bot API base URL. We compose full endpoints from this.
 _TELEGRAM_API_URL = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}"
 
+
+# ============================================================
+# Public sending functions
+# ============================================================
 
 def send_label(png_bytes_or_pages, caption):
     """
     Sends one or more label images to the Telegram chat.
 
-    Args:
-      png_bytes_or_pages: either a single image as bytes, or a list of image
-        bytes when the original PDF had multiple pages.
-      caption: a string shown below the first image (order info for the employee).
+    Accepts either a single bytes object or a list of bytes objects.
+    Returns True only if every page delivered successfully.
 
-    Returns:
-      True if Telegram confirmed delivery for all pages, False if anything
-      went wrong on any page.
-
-    Why we return a bool instead of raising an exception:
-      main.py uses this return value to decide whether to mark the order
-      as processed. If we raised an exception, main.py would have to wrap
-      every call in try/except, which is noisier than just checking a bool.
+    Why a bool return (vs raising):
+      main.py uses this return value to decide whether to mark a package as
+      processed. A bool keeps the call site simple and avoids wrapping every
+      call in try/except.
     """
 
-    # STEP 1: Normalize the input so we always iterate over a list of pages.
+    # STEP 1: Normalize to a list of pages.
     if isinstance(png_bytes_or_pages, (bytes, bytearray)):
         png_pages = [bytes(png_bytes_or_pages)]
     else:
@@ -58,6 +61,9 @@ def send_label(png_bytes_or_pages, caption):
             "photo": (f"label_{page_index}.png", png_bytes, "image/png"),
         }
 
+        # The full caption only appears on the first page. Subsequent pages
+        # get a short "Halaman N/M" label so the employee knows they belong
+        # together.
         page_caption = caption
         if total_pages > 1:
             page_label = f"🧾 Halaman {page_index}/{total_pages}"
@@ -68,15 +74,14 @@ def send_label(png_bytes_or_pages, caption):
             "caption": page_caption,
         }
 
-        # STEP 3: Send the request. We catch errors here so we can return False
-        # instead of letting an exception bubble up to main.py.
+        # STEP 3: Send. Catch transport errors so we can return False cleanly.
         try:
             response = requests.post(url, files=files, data=data, timeout=30)
         except requests.RequestException as e:
             print(f"  Telegram request failed on page {page_index}: {e}")
             return False
 
-        # STEP 4: Check the response. Telegram returns {"ok": true, ...} on success.
+        # STEP 4: Check the response.
         if response.status_code != 200:
             print(
                 f"  Telegram returned status {response.status_code} "
@@ -89,43 +94,27 @@ def send_label(png_bytes_or_pages, caption):
             print(f"  Telegram rejected page {page_index}: {response_json}")
             return False
 
-    # STEP 5: Delivery confirmed for every page.
     return True
 
 
 def send_summary(text):
     """
-    Sends a plain text status message to the Telegram chat.
-
-    Used at the end of every run as a "heartbeat" so the employee knows the
-    bot is alive, even when there are zero new orders to process.
-
-    Args:
-      text: the message to send (plain text, no images).
-
-    Returns:
-      True if delivered, False otherwise. We do not retry on failure
-      because the next scheduled run will send another summary anyway.
+    Sends a plain-text status/heartbeat message. We do not retry on failure
+    because the next scheduled run will send another summary anyway.
     """
 
-    # STEP 1: Build the URL for the sendMessage endpoint.
-    # Note: this is a different endpoint than sendPhoto.
     url = f"{_TELEGRAM_API_URL}/sendMessage"
-
-    # STEP 2: Prepare the request body.
     data = {
         "chat_id": config.TELEGRAM_CHAT_ID,
         "text": text,
     }
 
-    # STEP 3: Send the request.
     try:
         response = requests.post(url, data=data, timeout=30)
     except requests.RequestException as e:
         print(f"  Telegram summary failed: {e}")
         return False
 
-    # STEP 4: Check the response.
     if response.status_code != 200:
         print(f"  Telegram returned status {response.status_code}: {response.text}")
         return False
@@ -133,117 +122,67 @@ def send_summary(text):
     return True
 
 
+# ============================================================
+# Caption builder (follows process_waybill.py logic)
+# ============================================================
+
 def build_caption(order):
     """
-    Builds a human-readable caption for a single order, in Bahasa Indonesia.
+    Builds the per-label caption in Bahasa Indonesia.
 
-    The caption appears below the label image in Telegram and helps the
-    employee match the printed label with the right items in the warehouse.
+    Output shape:
+      📦 {order_id}
+      🚚 {courier}
 
-    We show the SKU instead of the product name because product names on
-    Tiktok Shop are very long (e.g. "ITBisa - Socket IC DIP 16 Pin 2.54mm
-    Narrow 2x8 Lubang 8x2 Dudukan IC DIP16 untuk PCB Arduino & Project
-    Elektronika"), but warehouse shelves are organized by SKU. SKU is
-    short, precise, and matches how items are physically labeled.
+      Barang:
+        • {qty} x {sku}
 
-    We do not show recipient name or address because Tiktok Shop masks them
-    in their API responses. The full unmasked details are visible on the
-    printed label itself, so the employee can see them when packing.
-
-    Args:
-      order: the order dict returned by tiktokshop_client.
-
-    Returns:
-      A formatted string ready to use as a Telegram caption.
+    Grouping: identical SKUs across item rows are summed into one line.
+    Multiple couriers: if different item rows report different
+      shipping_provider_name values, we append each SKU's courier(s) inline.
     """
 
-    # STEP 1: Pull out the basic fields.
-    order_id = order.get("order_id", "?")
-    courier = order.get("shipping_carrier") or "?"
+    # STEP 1: Pull the order id.
+    order_id = (
+            order.get("id")
+            or order.get("order_id")
+            or order.get("orderId")
+            or "?"
+    )
 
-    # STEP 2: Build a short summary of items using SKUs.
-    items = order.get("item_list", [])
-    item_lines = []
-    for item in items:
-        qty = item.get("model_quantity_purchased", 1)
-        sku = _pick_sku(item)
-        item_lines.append(f"  • {qty} x {sku}")
+    # STEP 2: Build grouped item lines + collect distinct item-level couriers.
+    item_lines, distinct_couriers = _extract_grouped_item_lines(order)
+
+    # STEP 3: Top courier line comes ONLY from item-level shipping_provider_name.
+    courier = " / ".join(distinct_couriers) if distinct_couriers else "?"
     items_text = "\n".join(item_lines) if item_lines else "  (tidak ada barang)"
 
-    # STEP 3: Assemble the caption in Bahasa Indonesia.
-    caption = (
+    # STEP 4: Assemble.
+    return (
         f"📦 {order_id}\n"
         f"🚚 {courier}\n"
         f"\n"
         f"Barang:\n"
         f"{items_text}"
     )
-    return caption
-
-
-def _pick_sku(item):
-    """
-    Returns the most specific SKU for a Tiktok Shop order item.
-
-    Tiktok Shop's item_list entries may include both:
-      - item_sku:  the parent product SKU ("SKU Utama")
-      - model_sku: the variant SKU when the product has variants ("SKU Varian")
-
-    The rule: if the variant SKU exists, use it. Otherwise fall back to the
-    main SKU. This matches how the warehouse organizes stock, where variants
-    like colors and sizes each have their own shelf location.
-
-    Example:
-      - LED 5mm has no variants -> model_sku is empty, use item_sku ITBISA-LED-5MM.
-      - LED 5mm Red is a variant -> use model_sku ITBISA-LED-5MM-RED.
-
-    If both SKUs are missing (seller forgot to assign them), we fall back to
-    the product name. A long name is still more useful to the employee than
-    a cryptic placeholder, because it at least tells them what the item is.
-    """
-
-    # STEP 1: Prefer the variant SKU when it is present and non-empty.
-    model_sku = item.get("model_sku", "").strip()
-    if model_sku:
-        return model_sku
-
-    # STEP 2: Fall back to the main product SKU.
-    item_sku = item.get("item_sku", "").strip()
-    if item_sku:
-        return item_sku
-
-    # STEP 3: Last resort - use the product name. Still useful for identification
-    # even if it is long, and better than a blank or cryptic placeholder.
-    return item.get("item_name", "(tidak ada nama)")
 
 
 def build_summary(time_hhmm, success_count, skipped_count):
     """
-    Builds the heartbeat summary message in Bahasa Indonesia.
+    Heartbeat message in Bahasa Indonesia.
 
-    Three patterns based on what happened during the run:
-      - 0 orders:   "✅ 11:00 - Tidak ada pesanan baru"
-      - All sent:   "✅ 12:00 - 3 label terkirim"
-      - Some failed: "⚠️ 13:00 - 2 terkirim, 1 gagal (akan dicoba lagi)"
-
-    Args:
-      time_hhmm: current Jakarta time as "HH:MM" string.
-      success_count: number of labels successfully sent this run.
-      skipped_count: number of orders that failed and will retry next run.
-
-    Returns:
-      A formatted string ready to send via send_summary().
+    Patterns:
+      - 0/0:     "✅ 11:00 - Tidak ada pesanan baru"
+      - all OK:  "✅ 12:00 - 3 label terkirim"
+      - partial: "⚠️ 13:00 - 2 terkirim, 1 gagal (akan dicoba lagi)"
     """
 
-    # STEP 1: No new orders this run.
     if success_count == 0 and skipped_count == 0:
         return f"✅ {time_hhmm} - Tidak ada pesanan baru"
 
-    # STEP 2: Everything was processed successfully.
     if skipped_count == 0:
         return f"✅ {time_hhmm} - {success_count} label terkirim"
 
-    # STEP 3: Some orders failed. Use a warning emoji so the employee notices.
     return (
         f"⚠️ {time_hhmm} - {success_count} terkirim, "
         f"{skipped_count} gagal (akan dicoba lagi)"
@@ -251,20 +190,172 @@ def build_summary(time_hhmm, success_count, skipped_count):
 
 
 def build_safety_stop_message(time_hhmm, order_count, max_allowed):
-    """
-    Builds the alert message for when there are suspiciously many orders.
-
-    This message uses stronger language because it requires human attention.
-
-    Args:
-      time_hhmm: current Jakarta time as "HH:MM" string.
-      order_count: how many new orders we saw.
-      max_allowed: the safety cap from config.
-
-    Returns:
-      A formatted alert string.
-    """
+    """Alert when we see suspiciously many new packages - needs human eyes."""
     return (
         f"⚠️ {time_hhmm} - PERINGATAN: {order_count} pesanan baru "
         f"melebihi batas {max_allowed}. Mohon dicek dahulu sebelum diproses."
     )
+
+
+# ============================================================
+# Internal helpers (grouping + field extraction)
+# ============================================================
+
+def _extract_grouped_item_lines(order):
+    """
+    Returns:
+      (list of caption lines, list of distinct couriers in first-seen order)
+
+    Groups items by SKU, sums quantities, and collects distinct couriers
+    from item-level shipping_provider_name only.
+    """
+
+    # STEP 1: Pull item rows from known container keys.
+    rows = _extract_item_rows_from_known_containers(order)
+    if not rows:
+        return [], []
+
+    # STEP 2: Aggregate by SKU.
+    grouped = {}
+    distinct_couriers = []
+    distinct_courier_set = set()
+
+    for row in rows:
+        sku = row["sku"]
+        qty = row["qty"]
+        courier = row["courier"]
+
+        if sku not in grouped:
+            grouped[sku] = {
+                "qty": 0,
+                "couriers": [],
+                "courier_set": set(),
+            }
+
+        grouped[sku]["qty"] += qty
+
+        if courier and courier not in grouped[sku]["courier_set"]:
+            grouped[sku]["courier_set"].add(courier)
+            grouped[sku]["couriers"].append(courier)
+
+        if courier and courier not in distinct_courier_set:
+            distinct_courier_set.add(courier)
+            distinct_couriers.append(courier)
+
+    # STEP 3: Build one line per SKU. If multiple distinct couriers exist
+    # across all rows, inline each SKU's courier(s) so the employee can tell
+    # which shipment a SKU belongs to.
+    multiple_distinct_couriers = len(distinct_couriers) > 1
+    lines = []
+    for sku, data in grouped.items():
+        total_qty = data["qty"]
+        sku_couriers = data["couriers"]
+        if multiple_distinct_couriers and sku_couriers:
+            courier_text = " / ".join(sku_couriers)
+            lines.append(f"  • {total_qty} x {sku} ({courier_text})")
+        else:
+            lines.append(f"  • {total_qty} x {sku}")
+
+    return lines, distinct_couriers
+
+
+def _extract_item_rows_from_known_containers(order):
+    """
+    Walks the order and pulls item rows only from known item containers:
+      - line_items / lineItems
+      - item_list
+      - sku_list
+
+    This matters because we only want courier from item-level
+    shipping_provider_name, not from random order-level fields like
+    delivery_option_name.
+    """
+
+    # STEP 1: Collect every known item container list.
+    item_lists = []
+    _collect_known_item_lists_recursive(order, item_lists)
+
+    # STEP 2: Normalize each item dict into a row.
+    rows = []
+    for item_list in item_lists:
+        for item in item_list:
+            if not isinstance(item, dict):
+                continue
+            rows.append({
+                "sku": _pick_sku(item),
+                "qty": _normalize_quantity(
+                    item.get("quantity")
+                    or item.get("model_quantity_purchased")
+                    or item.get("count")
+                    or 1
+                ),
+                "courier": _pick_item_level_shipping_provider_name(item),
+            })
+
+    return rows
+
+
+def _collect_known_item_lists_recursive(value, output_lists):
+    """Recursively finds known-item-container lists and appends them."""
+
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            if key in ("line_items", "lineItems", "item_list", "sku_list"):
+                if isinstance(nested, list):
+                    output_lists.append(nested)
+            _collect_known_item_lists_recursive(nested, output_lists)
+    elif isinstance(value, list):
+        for item in value:
+            _collect_known_item_lists_recursive(item, output_lists)
+
+
+def _pick_item_level_shipping_provider_name(item):
+    """Returns courier ONLY from item-level shipping_provider_name fields."""
+
+    if not isinstance(item, dict):
+        return None
+    courier = (
+            item.get("shipping_provider_name")
+            or item.get("shippingProviderName")
+    )
+    if courier is None:
+        return None
+    courier = str(courier).strip()
+    return courier or None
+
+
+def _pick_sku(item):
+    """
+    Picks the most specific SKU for an item.
+
+    Preference order:
+      1. model_sku    (variant SKU)
+      2. item_sku     (parent product SKU)
+      3. seller_sku   (TikTok Shop's common field)
+      4. sku_id       (last-resort numeric id)
+      5. product_name / item_name
+      6. "(tidak ada nama)"
+
+    Warehouse shelves are organized by SKU, so we prefer SKU over name.
+    """
+
+    return (
+            (item.get("model_sku") or "").strip()
+            or (item.get("item_sku") or "").strip()
+            or (item.get("seller_sku") or "").strip()
+            or str(item.get("sku_id") or "").strip()
+            or item.get("product_name")
+            or item.get("item_name")
+            or "(tidak ada nama)"
+    )
+
+
+def _normalize_quantity(value):
+    """Coerces a quantity value into an int safely (handles '2', '2.0', etc.)."""
+
+    if isinstance(value, int):
+        return value
+    try:
+        return int(float(str(value)))
+    except (TypeError, ValueError):
+        return 1
