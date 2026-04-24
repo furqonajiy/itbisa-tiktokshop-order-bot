@@ -35,16 +35,13 @@ from src import (
     tiktokshop_client,
 )
 
-
 # Jakarta is UTC+7. We use this to format the time in summaries.
 JAKARTA_TZ = timezone(timedelta(hours=7))
-
 
 
 def _now_jakarta_hhmm():
     """Returns the current time in Jakarta as a HH:MM string."""
     return datetime.now(JAKARTA_TZ).strftime("%H:%M")
-
 
 
 def run():
@@ -69,7 +66,6 @@ def run():
         print(f"\n{alert}")
         print(f"Details: {e}")
         sys.exit(1)
-
 
 
 def _do_run():
