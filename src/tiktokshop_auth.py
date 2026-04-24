@@ -1,35 +1,28 @@
 """
-shopee_auth.py
---------------
-Manages the Shopee access_token and refresh_token lifecycle.
+tiktokshop_auth.py
+------------------
+Manages the TikTok Shop access_token and refresh_token lifecycle.
 
 Why this file exists:
-  Shopee tokens expire on a schedule:
-    - access_token: valid for 4 hours
-    - refresh_token: valid for 30 days
+  TikTok Shop tokens expire on a schedule. Instead of making the rest of the
+  code care about expiry times, this module owns that problem. Callers only ask
+  for "a valid access token" and this module checks freshness, refreshes when
+  needed, and saves the updated token bundle back to disk.
 
-  Since the bot runs every hour, the access_token will always need refreshing
-  on most runs. This module handles that transparently: callers just ask for
-  "a valid access token" and this module takes care of checking expiry,
-  refreshing if needed, and saving the updated tokens back to disk.
-
-  Tokens are stored in data/shopee_tokens.json, which is committed back to
+  Tokens are stored in data/tiktokshop_tokens.json, which is committed back to
   the repo at the end of each run (same pattern as processed_orders.json).
 
-Public functions (used by shopee_client.py):
+Public functions (used by tiktokshop_client.py):
   - get_valid_access_token() -> string (an access token known to be fresh)
 
-When refresh_token itself expires (every 30 days):
-  The refresh call will fail with an error from Shopee. This module raises
-  RefreshTokenExpiredError, which main.py catches and reports via Telegram
-  so the shop owner can manually re-authorize through the Shopee Console.
+When refresh_token itself expires:
+  The refresh call will fail with an error from TikTok Shop. This module raises
+  RefreshTokenExpiredError, which main.py catches and reports via Telegram so
+  the shop owner can manually re-authorize through TikTok Shop Open Platform.
 """
 
-import hashlib
-import hmac
 import json
 import os
-import time
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -44,13 +37,13 @@ from src import config
 class RefreshTokenExpiredError(Exception):
     """
     Raised when the refresh_token itself has expired and a human must
-    re-authorize the app through the Shopee Open Platform Console.
+    re-authorize the app through TikTok Shop Open Platform.
     """
     pass
 
 
 # ============================================================
-# Public function (used by shopee_client.py)
+# Public function (used by tiktokshop_client.py)
 # ============================================================
 
 def get_valid_access_token():
@@ -66,7 +59,7 @@ def get_valid_access_token():
 
     Raises:
       RefreshTokenExpiredError: if the refresh_token has also expired and
-        a human must manually re-authorize the app in Shopee Console.
+        a human must manually re-authorize the app.
       FileNotFoundError: if the tokens file does not exist (first-run
         bootstrap not done yet).
     """
@@ -76,11 +69,11 @@ def get_valid_access_token():
 
     # STEP 2: Check if the current access token is still fresh enough.
     if _is_access_token_fresh(tokens):
-        print(f"  Access token is still fresh, using it directly")
+        print("  Access token is still fresh, using it directly")
         return tokens["access_token"]
 
     # STEP 3: Token is expired or about to expire. Refresh it.
-    print(f"  Access token is expired or expiring soon, refreshing...")
+    print("  Access token is expired or expiring soon, refreshing...")
     new_tokens = _refresh_tokens(tokens["refresh_token"])
 
     # STEP 4: Save the new tokens to disk for future runs.
@@ -107,8 +100,7 @@ def _load_tokens():
 
     Raises:
       FileNotFoundError: if the file does not exist. This means the very
-        first-run bootstrap has not been done yet and a human must seed
-        the file with initial tokens from the Shopee Console.
+        first-run bootstrap has not been done yet.
     """
 
     # STEP 1: Check that the file exists. If not, give a clear error message
@@ -117,12 +109,12 @@ def _load_tokens():
         raise FileNotFoundError(
             f"Tokens file not found at {config.TOKENS_FILE_PATH}. "
             f"You need to bootstrap initial tokens by authorizing the app "
-            f"in the Shopee Open Platform Console and saving the resulting "
-            f"access_token and refresh_token to this file."
+            f"in TikTok Shop Open Platform and saving the resulting token "
+            f"bundle to this file."
         )
 
     # STEP 2: Read and parse the JSON file.
-    with open(config.TOKENS_FILE_PATH, "r") as f:
+    with open(config.TOKENS_FILE_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -138,7 +130,7 @@ def _save_tokens(tokens):
     os.makedirs(os.path.dirname(config.TOKENS_FILE_PATH), exist_ok=True)
 
     # STEP 2: Write the JSON file with indentation so git diffs are readable.
-    with open(config.TOKENS_FILE_PATH, "w") as f:
+    with open(config.TOKENS_FILE_PATH, "w", encoding="utf-8") as f:
         json.dump(tokens, f, indent=2, sort_keys=True)
 
 
@@ -150,20 +142,16 @@ def _is_access_token_fresh(tokens):
     """
     Returns True if the access token will still be valid after the
     configured refresh buffer, False if it needs to be refreshed.
-
-    We refresh a few minutes BEFORE actual expiry so that we never attempt
-    an API call with a token that expires mid-flight.
     """
 
     # STEP 1: Parse the expiry timestamp from the tokens file.
     expires_at_iso = tokens.get("access_token_expires_at")
     if not expires_at_iso:
-        # No expiry info means we cannot trust the token, refresh to be safe.
         return False
+
     expires_at = datetime.fromisoformat(expires_at_iso)
 
     # STEP 2: Compute the "must refresh before" cutoff time.
-    # If the token expires within the next N minutes, treat it as stale.
     buffer = timedelta(minutes=config.TOKEN_REFRESH_BUFFER_MINUTES)
     cutoff = datetime.now(timezone.utc) + buffer
 
@@ -177,12 +165,8 @@ def _is_access_token_fresh(tokens):
 
 def _refresh_tokens(refresh_token):
     """
-    Calls Shopee's refresh endpoint to exchange the refresh_token for a
+    Calls TikTok Shop's refresh endpoint to exchange the refresh_token for a
     fresh access_token and a fresh refresh_token.
-
-    Important: Shopee rotates the refresh_token on every refresh. We MUST
-    save the new refresh_token returned by this call, otherwise the next
-    refresh will fail.
 
     Args:
       refresh_token: the current refresh_token string.
@@ -191,63 +175,103 @@ def _refresh_tokens(refresh_token):
       A dict with access_token, refresh_token, access_token_expires_at.
 
     Raises:
-      RefreshTokenExpiredError: if Shopee says the refresh_token is expired.
+      RefreshTokenExpiredError: if TikTok Shop says the refresh_token is expired.
     """
 
-    # STEP 1: Build the request. The refresh endpoint uses a slightly different
-    # signature format than shop-level calls: only partner_id + path + timestamp.
-    path = "/api/v2/auth/access_token/get"
-    timestamp = int(time.time())
-
-    base_string = f"{config.SHOPEE_PARTNER_ID}{path}{timestamp}"
-    signature = hmac.new(
-        config.SHOPEE_PARTNER_KEY.encode("utf-8"),
-        base_string.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-    url = (
-        f"{config.SHOPEE_API_BASE_URL}{path}"
-        f"?partner_id={config.SHOPEE_PARTNER_ID}"
-        f"&timestamp={timestamp}"
-        f"&sign={signature}"
-    )
-
+    # STEP 1: Build the request body exactly as the public TikTok Shop Open API
+    # collection expects it.
+    path = "/api/token/refreshToken"
+    url = f"{config.TIKTOKSHOP_AUTH_BASE_URL}{path}"
     body = {
-        "partner_id": config.SHOPEE_PARTNER_ID,
+        "app_key": config.TIKTOKSHOP_APP_KEY,
+        "app_secret": config.TIKTOKSHOP_APP_SECRET,
         "refresh_token": refresh_token,
-        "shop_id": config.SHOPEE_SHOP_ID,
+        "grant_type": "refresh_token",
     }
 
     # STEP 2: Call the refresh endpoint.
     response = requests.post(url, json=body, timeout=30)
-    response.raise_for_status()
-    data = response.json()
+    data = _safe_json(response)
 
-    # STEP 3: Check for the "refresh token expired" error. Shopee returns this
-    # with an error field in the JSON body. The exact error string may vary
-    # but will contain either "expired" or "invalid" related to the token.
-    error = data.get("error", "")
-    if error:
-        if "token" in error.lower() and ("expired" in error.lower() or "invalid" in error.lower()):
+    # STEP 3: Check for TikTok Shop API errors first.
+    if response.status_code != 200 or _has_api_error(data):
+        message = _extract_error_message(data) or response.text
+        lowered = message.lower()
+        if "refresh" in lowered and ("expired" in lowered or "invalid" in lowered):
             raise RefreshTokenExpiredError(
-                f"Shopee refresh_token is expired or invalid. Please re-authorize "
-                f"the app in Shopee Open Platform Console. Error: {error}"
+                "TikTok Shop refresh_token is expired or invalid. Please "
+                f"re-authorize the app. Error: {message}"
             )
-        # Some other error from Shopee. Let it bubble up.
-        raise RuntimeError(f"Shopee refresh failed: {data}")
+        raise RuntimeError(f"TikTok Shop refresh failed: {message}")
 
-    # STEP 4: Extract the new tokens and compute the absolute expiry timestamp.
-    # Shopee returns expire_in as seconds-from-now, we store absolute time
-    # because it's easier to compare against "now" on the next run.
-    new_access_token = data["access_token"]
-    new_refresh_token = data["refresh_token"]
-    expire_in_seconds = data["expire_in"]
+    # STEP 4: Extract the new token bundle and compute the absolute expiry timestamp.
+    payload = _extract_payload(data)
+    new_access_token = payload["access_token"]
+    new_refresh_token = payload.get("refresh_token", refresh_token)
+    expire_in_seconds = int(
+        payload.get("access_token_expire_in")
+        or payload.get("expire_in")
+        or payload.get("expires_in")
+        or 0
+    )
 
-    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expire_in_seconds)
+    if expire_in_seconds <= 0:
+        # STEP 5: Be defensive. If TikTok Shop did not return expiry seconds,
+        # force an early refresh next run rather than trusting a stale token.
+        expires_at = datetime.now(timezone.utc)
+    else:
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expire_in_seconds)
 
     return {
         "access_token": new_access_token,
         "refresh_token": new_refresh_token,
         "access_token_expires_at": expires_at.isoformat(),
     }
+
+
+# ============================================================
+# Internal helpers (response parsing)
+# ============================================================
+
+def _safe_json(response):
+    """Returns parsed JSON if possible, else an empty dict."""
+    try:
+        return response.json()
+    except ValueError:
+        return {}
+
+
+
+def _has_api_error(data):
+    """
+    Returns True if the response JSON looks like a TikTok Shop API error.
+    """
+    code = data.get("code")
+    if code in (None, 0, "0"):
+        return False
+    return True
+
+
+
+def _extract_error_message(data):
+    """Pulls the most helpful error message we can find from the response."""
+    return (
+        data.get("message")
+        or data.get("msg")
+        or data.get("error")
+        or data.get("error_message")
+        or ""
+    )
+
+
+
+def _extract_payload(data):
+    """
+    Normalizes TikTok Shop responses into the object that actually contains the
+    useful fields.
+    """
+    if isinstance(data.get("data"), dict):
+        return data["data"]
+    if isinstance(data.get("response"), dict):
+        return data["response"]
+    return data

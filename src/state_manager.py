@@ -27,9 +27,8 @@ def load():
     """
     Loads the processed orders dictionary from disk.
 
-    Also prunes any entries older than STATE_RETENTION_DAYS, because Shopee
-    will not let us ship orders that old anyway, so there is no point
-    remembering them forever.
+    Also prunes any entries older than STATE_RETENTION_DAYS, because there is
+    no point remembering them forever.
 
     Returns:
       dict mapping order_id (str) -> processed_at_iso_timestamp (str)
@@ -40,7 +39,7 @@ def load():
         return {}
 
     # STEP 2: Read the JSON file from disk.
-    with open(config.STATE_FILE_PATH, "r") as f:
+    with open(config.STATE_FILE_PATH, "r", encoding="utf-8") as f:
         state = json.load(f)
 
     # STEP 3: Remove entries older than the retention period.
@@ -71,7 +70,7 @@ def save(state):
 
     # STEP 2: Write the JSON file with nice indentation so it is easy to read
     # in the git history when we look at commit diffs.
-    with open(config.STATE_FILE_PATH, "w") as f:
+    with open(config.STATE_FILE_PATH, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, sort_keys=True)
 
 
