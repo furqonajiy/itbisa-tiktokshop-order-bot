@@ -21,7 +21,6 @@ from datetime import datetime, timezone
 from reportlab.lib.pagesizes import A6
 from reportlab.pdfgen import canvas
 
-
 # ============================================================
 # Canned fake orders
 # ============================================================
