@@ -81,10 +81,10 @@ def _search_orders_by_status(status):
         _check_ok(response, context=f"order search ({status})")
 
         payload = response.json()["data"]
-        all_orders.extend(payload["orders"])
+        all_orders.extend(payload.get("orders", []))
 
         # TikTok returns an empty string on the last page.
-        page_token = payload["next_page_token"]
+        page_token = payload.get("next_page_token", "")
         if not page_token:
             break
 
