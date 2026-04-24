@@ -140,8 +140,6 @@ def main():
             # STEP 6f: Build a Telegram caption.
             caption = _build_caption(
                 order=source_order,
-                package_id=package_id,
-                document_type=DOCUMENT_TYPE,
             )
 
             # STEP 6g: Send the image(s) to Telegram.
@@ -270,7 +268,7 @@ def _extract_package_jobs(orders):
         package_ids = sorted(_find_package_ids_recursive(order))
 
         for package_id in package_ids:
-            # Keep the first matching order as the source object for caption building.
+            # STEP 1a: Keep the first matching order as the source object for caption building.
             if package_id not in package_id_to_order:
                 package_id_to_order[package_id] = order
 
@@ -303,19 +301,19 @@ def _find_package_ids_recursive(value):
         for key, nested_value in value.items():
             normalized_key = str(key)
 
-            # Direct single package id fields.
+            # STEP 1a: Direct single package id fields.
             if normalized_key in ("package_id", "packageId"):
                 if nested_value not in (None, ""):
                     found.add(str(nested_value))
 
-            # Direct list-of-package-id fields.
+            # STEP 1b: Direct list-of-package-id fields.
             if normalized_key in ("package_ids", "packageIds"):
                 if isinstance(nested_value, list):
                     for item in nested_value:
                         if item not in (None, ""):
                             found.add(str(item))
 
-            # Continue recursive scan for nested objects/lists.
+            # STEP 1c: Continue recursive scan for nested objects/lists.
             found.update(_find_package_ids_recursive(nested_value))
 
     # STEP 2: Handle lists.
@@ -474,11 +472,22 @@ def _make_signature(path, query_params, body_string, app_secret):
     return signature
 
 
-def _build_caption(order, package_id, document_type):
+def _build_caption(order):
     """
-    Builds a simple Telegram caption for one package waybill.
+    Builds a Telegram caption using the same style as the existing bot.
 
-    We keep the caption short so it is easy for warehouse staff to read.
+    Existing style:
+      📦 {order_id}
+      🚚 {courier}
+
+      Barang:
+        • {qty} x {sku}
+
+    New behavior:
+      - repeated SKUs are grouped
+      - courier is taken ONLY from shipping_provider_name on item rows
+      - if there are multiple distinct item-level couriers, we append the
+        courier to each SKU line when available
     """
 
     # STEP 1: Pull out the order id if available.
@@ -489,78 +498,223 @@ def _build_caption(order, package_id, document_type):
             or "?"
     )
 
-    # STEP 2: Pull out a readable status if available.
-    status = (
-            order.get("order_status")
-            or order.get("status")
-            or order.get("orderStatus")
-            or "-"
-    )
+    # STEP 2: Build grouped item lines and collect distinct item-level couriers.
+    item_lines, distinct_couriers = _extract_grouped_item_lines(order)
 
-    # STEP 3: Try to summarize item lines from common response shapes.
-    item_lines = _extract_item_lines(order)
-    items_text = "\n".join(item_lines) if item_lines else "  (detail barang tidak tersedia)"
+    # STEP 3: Build the top courier line ONLY from item-level shipping_provider_name.
+    courier = " / ".join(distinct_couriers) if distinct_couriers else "?"
 
-    # STEP 4: Assemble the caption in Bahasa Indonesia.
+    items_text = "\n".join(item_lines) if item_lines else "  (tidak ada barang)"
+
+    # STEP 4: Assemble the caption in the same style as the existing bot.
     caption = (
-        f"📦 Order: {order_id}\n"
-        f"📮 Package: {package_id}\n"
-        f"🧾 Document: {document_type}\n"
-        f"📌 Status: {status}\n"
+        f"📦 {order_id}\n"
+        f"🚚 {courier}\n"
         f"\n"
         f"Barang:\n"
         f"{items_text}"
     )
+
     return caption
 
 
-def _extract_item_lines(order):
+def _extract_grouped_item_lines(order):
     """
-    Tries to build readable item lines from several common TikTok Shop shapes.
+    Groups item rows by SKU and returns:
+      1. readable caption lines
+      2. distinct item-level couriers
 
-    This is intentionally defensive because the exact field names can differ
-    between endpoints and versions.
+    Courier source rule:
+      courier is read ONLY from:
+        - shipping_provider_name
+        - shippingProviderName
+
+    and ONLY from item rows under:
+      - line_items
+      - item_list
+      - lineItems
+      - sku_list
     """
 
-    # STEP 1: Look for the most common item containers.
-    items = (
-            order.get("item_list")
-            or order.get("line_items")
-            or order.get("lineItems")
-            or order.get("sku_list")
-            or []
+    # STEP 1: Extract item rows from known item containers only.
+    rows = _extract_item_rows_from_known_containers(order)
+
+    if not rows:
+        return [], []
+
+    # STEP 2: Aggregate quantity by SKU and collect courier set per SKU.
+    grouped = {}
+    distinct_couriers = []
+    distinct_courier_set = set()
+
+    for row in rows:
+        sku = row["sku"]
+        qty = row["qty"]
+        courier = row["courier"]
+
+        if sku not in grouped:
+            grouped[sku] = {
+                "qty": 0,
+                "couriers": [],
+                "courier_set": set(),
+            }
+
+        grouped[sku]["qty"] += qty
+
+        if courier and courier not in grouped[sku]["courier_set"]:
+            grouped[sku]["courier_set"].add(courier)
+            grouped[sku]["couriers"].append(courier)
+
+        if courier and courier not in distinct_courier_set:
+            distinct_courier_set.add(courier)
+            distinct_couriers.append(courier)
+
+    # STEP 3: Build one caption line per SKU.
+    lines = []
+    multiple_distinct_couriers = len(distinct_couriers) > 1
+
+    for sku, data in grouped.items():
+        total_qty = data["qty"]
+        sku_couriers = data["couriers"]
+
+        if multiple_distinct_couriers and sku_couriers:
+            courier_text = " / ".join(sku_couriers)
+            lines.append(f"  • {total_qty} x {sku} ({courier_text})")
+        else:
+            lines.append(f"  • {total_qty} x {sku}")
+
+    return lines, distinct_couriers
+
+
+def _extract_item_rows_from_known_containers(order):
+    """
+    Extracts item rows only from known item containers.
+
+    This is important because the user explicitly wants courier to come
+    from shipping_provider_name ONLY for each SKU under line_items,
+    not from delivery_option_name or other order-level fields.
+    """
+
+    rows = []
+
+    # STEP 1: Collect all item lists from known container names.
+    item_lists = []
+    _collect_known_item_lists_recursive(order, item_lists)
+
+    # STEP 2: Convert each item dict into a normalized row.
+    for item_list in item_lists:
+        for item in item_list:
+            if not isinstance(item, dict):
+                continue
+
+            rows.append({
+                "sku": _pick_sku(item),
+                "qty": _normalize_quantity(
+                    item.get("quantity")
+                    or item.get("model_quantity_purchased")
+                    or item.get("count")
+                    or 1
+                ),
+                "courier": _pick_item_level_shipping_provider_name(item),
+            })
+
+    return rows
+
+
+def _collect_known_item_lists_recursive(value, output_lists):
+    """
+    Recursively looks for known item container fields and collects their lists.
+
+    Known item containers:
+      - line_items
+      - lineItems
+      - item_list
+      - sku_list
+    """
+
+    # STEP 1: Handle dictionaries.
+    if isinstance(value, dict):
+        for key, nested_value in value.items():
+            if key in ("line_items", "lineItems", "item_list", "sku_list"):
+                if isinstance(nested_value, list):
+                    output_lists.append(nested_value)
+
+            _collect_known_item_lists_recursive(nested_value, output_lists)
+
+    # STEP 2: Handle lists.
+    elif isinstance(value, list):
+        for item in value:
+            _collect_known_item_lists_recursive(item, output_lists)
+
+
+def _pick_item_level_shipping_provider_name(item):
+    """
+    Returns courier ONLY from item-level shipping_provider_name fields.
+
+    No fallback to:
+      - delivery_option_name
+      - shipping_carrier
+      - fulfillment_type
+      - other order-level fields
+    """
+
+    if not isinstance(item, dict):
+        return None
+
+    courier = (
+            item.get("shipping_provider_name")
+            or item.get("shippingProviderName")
     )
 
-    if not isinstance(items, list):
-        return []
+    if courier is None:
+        return None
 
-    lines = []
+    courier = str(courier).strip()
+    return courier or None
 
-    # STEP 2: Build one line per item.
-    for item in items:
-        if not isinstance(item, dict):
-            continue
 
-        qty = (
-                item.get("quantity")
-                or item.get("model_quantity_purchased")
-                or item.get("count")
-                or 1
-        )
+def _pick_sku(item):
+    """
+    Returns the most specific SKU for one item.
 
-        sku = (
-                (item.get("model_sku") or "").strip()
-                or (item.get("item_sku") or "").strip()
-                or (item.get("seller_sku") or "").strip()
-                or (item.get("sku_id") or "").strip()
-                or item.get("product_name")
-                or item.get("item_name")
-                or "(tidak ada nama)"
-        )
+    Preference order:
+      1. model_sku
+      2. item_sku
+      3. seller_sku
+      4. sku_id
+      5. product_name / item_name
+    """
 
-        lines.append(f"  • {qty} x {sku}")
+    return (
+            (item.get("model_sku") or "").strip()
+            or (item.get("item_sku") or "").strip()
+            or (item.get("seller_sku") or "").strip()
+            or str(item.get("sku_id") or "").strip()
+            or item.get("product_name")
+            or item.get("item_name")
+            or "(tidak ada nama)"
+    )
 
-    return lines
+
+def _normalize_quantity(value):
+    """
+    Converts a quantity value into an integer safely.
+
+    This is defensive because APIs sometimes return:
+      - int
+      - string like "2"
+      - float-like string such as "2.0"
+    """
+
+    # STEP 1: Handle normal integers quickly.
+    if isinstance(value, int):
+        return value
+
+    # STEP 2: Try string/float-like conversion.
+    try:
+        return int(float(str(value)))
+    except (TypeError, ValueError):
+        return 1
 
 
 def _build_summary_message(success_count, failed_packages):
@@ -575,7 +729,7 @@ def _build_summary_message(success_count, failed_packages):
     # STEP 2: Include a short failure list when some packages failed.
     failed_list = ", ".join(package_id for package_id, _ in failed_packages[:10])
     return (
-        f"⚠️ Waybill selesai diproses. "
+        f"⚠️ Waybill s  elesai diproses. "
         f"Berhasil: {success_count}, gagal: {len(failed_packages)}.\n"
         f"Package gagal: {failed_list}"
     )
