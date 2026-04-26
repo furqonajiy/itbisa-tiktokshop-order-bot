@@ -362,7 +362,7 @@ def _build_base_sku_mapping():
             "POST",
             "/product/202502/products/search",
             extra_query=extra_query,
-            body={},
+            body={"status": "ACTIVATE"},
         )
         tiktokshop_client._check_ok(response, context="product search")
 
