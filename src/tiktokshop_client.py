@@ -244,7 +244,8 @@ def _call_signed(method, path, extra_query=None, body=None, include_cipher=True)
         return requests.get(url, params=query_params, headers=headers, timeout=30)
 
     headers["content-type"] = "application/json"
-    return requests.post(
+    return requests.request(
+        method,
         url,
         params=query_params,
         headers=headers,
