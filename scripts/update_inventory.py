@@ -1,53 +1,83 @@
 """
 update_inventory.py
 -------------------
-Updates Shopee inventory from an Excel file.
+Updates TikTok Shop inventory from an Excel file.
 
 What this script does:
   1. Reads an Excel file with two columns: SKU and Stock.
-  2. Fetches all your products from Shopee, including their variants.
-  3. Builds a lookup map: SKU -> (item_id, model_id or None).
-  4. For each SKU in your Excel, updates the stock on Shopee.
+  2. Paginates POST /product/202502/products/search. The 202502 search
+     response includes the full SKU detail inline (id, seller_sku,
+     inventory[]), so one paginated call gives us everything we need
+     to build the SKU lookup. No per-product detail call required.
+  3. Builds a lookup map: seller_sku -> [list of (product_id, sku_id,
+     warehouse_id)]. The list matters: shared SKUs like packaging or
+     accessories live on many products, and we want to update ALL of
+     them when the warehouse sets a new stock count.
+  4. For each SKU in your Excel, calls PUT update inventory once per
+     product that carries that SKU.
   5. Prints a summary of what succeeded, failed, or was skipped.
 
+APIs used:
+  POST /product/202502/products/search                              (read)
+  PUT  /product/202309/products/{product_id}/inventory/update       (write)
+
+  Both are NEW (post-September 2023) TikTok Shop Open API endpoints.
+  Legacy /api/products/* endpoints are not used. The search endpoint is
+  intentionally on 202502 because that version returns full SKU detail
+  in the search response, eliminating the need for per-product fetches.
+  The signed `version` query param must match the path version, so we
+  override the client default (202309) for the search call only.
+
 Excel format expected:
-  - First row: headers "SKU" and "Stock" (column order matters)
-  - Subsequent rows: one product per row
+  - Row 1: headers "SKU" and "Stock" (column order matters, header text
+    is ignored)
+  - Subsequent rows: one SKU per row
   Example:
     SKU                              | Stock
-    ITBISA-SOCKET-IC-DIP16-NARROW    | 50
-    ITBISA-LED-SUPERBRIGHT-5MM-RED   | 100
+    ITBISA-LED-5MM-RED               | 100
+    ITBISA-BUBBLE-WRAP               | 0    ← will zero on every product
+                                              that uses this SKU
 
 Usage:
   python scripts/update_inventory.py path/to/inventory.xlsx
 
 Important notes:
-  - If a SKU in your Excel is not found on Shopee, it is skipped with a
-    warning. The run continues for other SKUs.
-  - If Shopee returns an error for a specific SKU, it is skipped with a
-    warning. Other SKUs continue.
-  - Shopee rate limits stock updates. The script adds a small delay
-    between calls to stay polite. A 500-SKU run takes roughly 10 minutes.
+  - SKUs not found in the TikTok Shop catalog are skipped with a warning.
+    The run continues for other SKUs.
+  - When one Excel SKU appears on N products (e.g. shared packaging),
+    we issue N PUT calls, one per product. The progress output shows
+    the product_id for each call so you can audit what was touched.
+  - Update Inventory is a per-product call (not bulk across products),
+    so the per-product fan-out is unavoidable. We delay between calls
+    to stay polite to TikTok's documented 20 QPS cap.
+  - The warehouse_id is auto-detected from each SKU's existing inventory
+    record. Multi-warehouse shops will only have the FIRST warehouse
+    updated; revisit this if the warehouse later moves to having multiple.
 """
 
-import hashlib
-import hmac
 import sys
 import time
 from pathlib import Path
 
 import openpyxl
-import requests
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src import config, shopee_auth
+from src import config, tiktokshop_client
 
 
-# How long to wait between API calls to stay polite and avoid rate limits.
-# Shopee's documented limit is roughly 1 request per second per shop.
+# Polite delay between PUT calls. TikTok docs mention 20 QPS as a cap;
+# we stay well below that to leave room for retries if needed.
 _DELAY_BETWEEN_CALLS_SECONDS = 1.0
+
+# TikTok's documented max for product search is 100. Larger pages mean
+# fewer paginated round-trips during catalog read.
+_SEARCH_PAGE_SIZE = 100
+
+# Versions per endpoint. See module docstring for why these differ.
+_SEARCH_API_VERSION = "202502"
+_INVENTORY_API_VERSION = "202309"
 
 
 def main():
@@ -63,76 +93,97 @@ def main():
         sys.exit(1)
 
     print("=" * 60)
-    print("Shopee Inventory Update")
+    print("TikTok Shop Inventory Update")
     print("=" * 60)
-    print(f"Environment: {config.SHOPEE_API_BASE_URL}")
-    print(f"Partner ID:  {config.SHOPEE_PARTNER_ID}")
-    print(f"Shop ID:     {config.SHOPEE_SHOP_ID}")
-    print(f"Excel file:  {excel_path}")
+    print(f"App key:    {config.TIKTOKSHOP_APP_KEY}")
+    print(f"Shop ID:    {config.TIKTOKSHOP_SHOP_ID}")
+    print(f"Excel file: {excel_path}")
     print()
 
     # STEP 1: Read the Excel file into a dict of SKU -> desired stock.
     print("[1/4] Reading Excel file...")
     desired_stock = _read_excel(excel_path)
-    print(f"  Found {len(desired_stock)} SKUs to process")
+    print(f"  Found {len(desired_stock)} unique SKUs to process")
     print()
 
-    # STEP 2: Fetch all products from Shopee and build the SKU -> id mapping.
-    # This is the slowest step because it may make dozens of API calls for
-    # shops with many products. We print progress so it does not look frozen.
-    print("[2/4] Fetching product catalog from Shopee...")
-    sku_to_ids = _build_sku_mapping()
-    print(f"  Mapped {len(sku_to_ids)} SKUs from Shopee catalog")
+    # STEP 2: Walk the entire catalog in one paginated call series and
+    # build the seller_sku -> [(product_id, sku_id, warehouse_id), ...] map.
+    print("[2/4] Fetching product catalog from TikTok Shop...")
+    sku_to_targets = _build_sku_mapping()
+    total_targets = sum(len(t) for t in sku_to_targets.values())
+    print(
+        f"  Mapped {len(sku_to_targets)} unique seller_skus "
+        f"across {total_targets} product/sku rows"
+    )
     print()
 
-    # STEP 3: Match each Excel SKU to its Shopee ids.
-    print("[3/4] Matching Excel SKUs to Shopee products...")
+    # STEP 3: Match each Excel SKU to its TikTok Shop ids. One Excel
+    # row may expand into multiple update jobs if the SKU is shared
+    # across products (very common for packaging/accessory SKUs).
+    print("[3/4] Matching Excel SKUs to TikTok Shop SKUs...")
     matched = []
     missing = []
     for sku, stock in desired_stock.items():
-        if sku in sku_to_ids:
-            item_id, model_id = sku_to_ids[sku]
-            matched.append((sku, stock, item_id, model_id))
-        else:
+        targets = sku_to_targets.get(sku, [])
+        if not targets:
             missing.append(sku)
+            continue
+        for product_id, sku_id, warehouse_id in targets:
+            matched.append((sku, stock, product_id, sku_id, warehouse_id))
 
-    print(f"  Matched: {len(matched)}")
-    print(f"  Missing: {len(missing)}")
+    matched_excel_skus = len(desired_stock) - len(missing)
+    print(f"  Excel SKUs matched: {matched_excel_skus}")
+    print(f"  Excel SKUs missing: {len(missing)}")
+    print(f"  Total update calls planned: {len(matched)}")
     if missing:
-        print("  These SKUs will be skipped (not found on Shopee):")
+        print("  Missing SKUs (not found on TikTok Shop, will be skipped):")
         for sku in missing:
             print(f"    - {sku}")
+
+    # Show fan-out so the operator notices when a SKU touches many products.
+    fanned_out = [
+        (sku, len(sku_to_targets[sku]))
+        for sku in desired_stock
+        if len(sku_to_targets.get(sku, [])) > 1
+    ]
+    if fanned_out:
+        print("  SKUs that exist on multiple products (each will be updated):")
+        for sku, count in fanned_out:
+            print(f"    - {sku}: {count} products")
     print()
 
     if not matched:
         print("Nothing to update. Exiting.")
         return
 
-    # STEP 4: Update each matched SKU's stock on Shopee.
-    print(f"[4/4] Updating stock for {len(matched)} products...")
+    # STEP 4: Update each matched SKU's stock on TikTok Shop.
+    print(f"[4/4] Issuing {len(matched)} update call(s)...")
     success_count = 0
     failed = []
-    for sku, stock, item_id, model_id in matched:
+    for sku, stock, product_id, sku_id, warehouse_id in matched:
+        label = f"{sku} (product {product_id})"
         try:
-            _update_stock(item_id, model_id, stock)
+            _update_stock(product_id, sku_id, warehouse_id, stock)
             success_count += 1
-            print(f"  ✓ {sku}: set stock to {stock}")
+            print(f"  ✓ {label}: set stock to {stock}")
         except Exception as e:
-            failed.append((sku, str(e)))
-            print(f"  ✗ {sku}: failed - {e}")
+            failed.append((label, str(e)))
+            print(f"  ✗ {label}: failed - {e}")
 
-        # Be polite to Shopee's rate limiter.
         time.sleep(_DELAY_BETWEEN_CALLS_SECONDS)
 
     print()
     print("=" * 60)
-    print(f"Done. {success_count} updated, {len(failed)} failed, {len(missing)} skipped.")
+    print(
+        f"Done. {success_count} updated, {len(failed)} failed, "
+        f"{len(missing)} skipped."
+    )
     print("=" * 60)
 
     if failed:
-        print("\nFailed SKUs (check these manually):")
-        for sku, err in failed:
-            print(f"  - {sku}: {err}")
+        print("\nFailed updates (check these manually):")
+        for label, err in failed:
+            print(f"  - {label}: {err}")
 
 
 # ============================================================
@@ -144,13 +195,12 @@ def _read_excel(path):
     Reads the Excel file and returns a dict of SKU -> stock.
 
     Expects the first row to be headers and the first two columns to
-    contain SKU and Stock. Any row where SKU is empty is skipped.
+    contain SKU and Stock. Rows where SKU is empty are skipped.
     """
 
     workbook = openpyxl.load_workbook(path, data_only=True)
     sheet = workbook.active
 
-    # STEP 1: Build the mapping, skipping the header row.
     result = {}
     for row_num, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
         if not row or len(row) < 2:
@@ -159,13 +209,11 @@ def _read_excel(path):
         sku_raw = row[0]
         stock_raw = row[1]
 
-        # Skip rows where SKU is empty.
         if sku_raw is None or str(sku_raw).strip() == "":
             continue
 
         sku = str(sku_raw).strip()
 
-        # Stock must be a number. Warn and skip rows where it is not.
         try:
             stock = int(stock_raw)
         except (TypeError, ValueError):
@@ -176,208 +224,151 @@ def _read_excel(path):
             print(f"  Row {row_num}: negative stock '{stock}' for SKU '{sku}', skipping")
             continue
 
+        # If the same SKU appears on more than one Excel row, the last
+        # value wins. We warn so the operator notices the duplicate.
+        if sku in result and result[sku] != stock:
+            print(
+                f"  Row {row_num}: SKU '{sku}' was already set to "
+                f"{result[sku]} on an earlier row; overwriting with {stock}"
+            )
         result[sku] = stock
 
     return result
 
 
 # ============================================================
-# Shopee product catalog fetching
+# TikTok Shop product catalog fetching (NEW API 202502 search)
 # ============================================================
 
 def _build_sku_mapping():
     """
-    Fetches all products from Shopee and returns a dict of
-    SKU -> (item_id, model_id or None).
+    Returns dict: seller_sku -> [list of (product_id, sku_id, warehouse_id)].
 
-    For products without variants, model_id is None.
-    For products with variants, each variant gets its own entry mapped
-    to (item_id, model_id).
+    Why a list and not a single tuple:
+      Some SKUs (packaging, accessories, common components) live on many
+      products. When the warehouse says "ITBISA-BUBBLE-WRAP = 0", they
+      mean every product that uses that SKU goes to 0, not just one
+      arbitrary product. The list captures every (product, sku, warehouse)
+      target so the caller can update all of them.
+
+    Implementation note:
+      The 202502 search response embeds skus[] inline, so this function
+      reads the entire catalog in one paginated walk and never needs
+      a per-product detail call. ~2 API calls for 118 products vs.
+      ~120 calls under the old 202309 detail-per-product flow.
     """
 
-    # STEP 1: Get the full list of item_ids in this shop.
-    all_item_ids = _fetch_all_item_ids()
-    print(f"  Found {len(all_item_ids)} products total")
-
-    if not all_item_ids:
-        return {}
-
-    # STEP 2: Fetch base info for each item in batches of 50 (Shopee's limit).
-    # This gives us the parent SKU.
-    sku_to_ids = {}
-    for batch_start in range(0, len(all_item_ids), 50):
-        batch = all_item_ids[batch_start:batch_start + 50]
-        items = _fetch_item_base_info(batch)
-        for item in items:
-            item_id = item["item_id"]
-            has_models = item.get("has_model", False)
-            parent_sku = (item.get("item_sku") or "").strip()
-
-            # If the item has no variants, the parent SKU maps directly to item_id.
-            if not has_models and parent_sku:
-                sku_to_ids[parent_sku] = (item_id, None)
-
-            # If the item has variants, we need to fetch each variant's SKU separately.
-            if has_models:
-                variant_skus = _fetch_model_skus(item_id)
-                for model_id, model_sku in variant_skus:
-                    if model_sku:
-                        sku_to_ids[model_sku] = (item_id, model_id)
-
-        # Small delay between batches to be polite.
-        time.sleep(_DELAY_BETWEEN_CALLS_SECONDS)
-
-    return sku_to_ids
-
-
-def _fetch_all_item_ids():
-    """
-    Fetches all item_ids in the shop using paginated get_item_list.
-    Returns a flat list of item_ids.
-    """
-
-    path = "/api/v2/product/get_item_list"
-    all_ids = []
-    offset = 0
-    page_size = 100  # Shopee's max
+    sku_to_targets = {}
+    page_token = None
+    page_num = 0
+    products_seen = 0
 
     while True:
-        params = {
-            "offset": offset,
-            "page_size": page_size,
-            "item_status": "NORMAL",
+        page_num += 1
+        extra_query = {
+            "page_size": str(_SEARCH_PAGE_SIZE),
+            "version": _SEARCH_API_VERSION,
         }
-        data = _call_shopee_get(path, params)
-        items = data.get("response", {}).get("item", [])
-        for item in items:
-            all_ids.append(item["item_id"])
+        if page_token:
+            extra_query["page_token"] = page_token
 
-        has_next = data.get("response", {}).get("has_next_page", False)
-        if not has_next:
+        # Body intentionally empty — matches your working curl. Adding a
+        # status filter here is supported but unnecessary; we want
+        # everything in the catalog so the warehouse can update any SKU.
+        body = {}
+        response = tiktokshop_client._call_signed(
+            "POST",
+            "/product/202502/products/search",
+            extra_query=extra_query,
+            body=body,
+        )
+        tiktokshop_client._check_ok(response, context="product search")
+
+        payload = response.json()["data"]
+        products = payload.get("products") or []
+        products_seen += len(products)
+
+        if page_num == 1:
+            total = payload.get("total_count", "?")
+            print(f"  Catalog reports {total} total products")
+
+        for product in products:
+            product_id = product["id"]
+            for sku in product.get("skus") or []:
+                seller_sku = (sku.get("seller_sku") or "").strip()
+                if not seller_sku:
+                    continue
+
+                sku_id = sku.get("id")
+                inventories = sku.get("inventory") or []
+                if not sku_id or not inventories:
+                    # Without an existing inventory record we don't know
+                    # which warehouse_id to target, so skip.
+                    continue
+
+                warehouse_id = inventories[0].get("warehouse_id")
+                if not warehouse_id:
+                    continue
+
+                sku_to_targets.setdefault(seller_sku, []).append(
+                    (product_id, sku_id, warehouse_id)
+                )
+
+        page_token = payload.get("next_page_token") or ""
+        print(f"  Page {page_num}: {len(products)} products (running total: {products_seen})")
+        if not page_token:
             break
-        offset += page_size
 
-    return all_ids
+        time.sleep(0.3)  # Be polite between pages.
 
-
-def _fetch_item_base_info(item_ids):
-    """
-    Fetches base info for up to 50 items at once. Returns the raw item
-    dicts, each containing item_id, item_sku, has_model, etc.
-    """
-
-    path = "/api/v2/product/get_item_base_info"
-    params = {"item_id_list": ",".join(str(i) for i in item_ids)}
-    data = _call_shopee_get(path, params)
-    return data.get("response", {}).get("item_list", [])
-
-
-def _fetch_model_skus(item_id):
-    """
-    For an item with variants, fetches the list of (model_id, model_sku)
-    tuples for each variant.
-    """
-
-    path = "/api/v2/product/get_model_list"
-    params = {"item_id": item_id}
-    data = _call_shopee_get(path, params)
-    models = data.get("response", {}).get("model", [])
-    return [(m["model_id"], (m.get("model_sku") or "").strip()) for m in models]
+    return sku_to_targets
 
 
 # ============================================================
-# Stock update
+# Inventory update (NEW API 202309)
 # ============================================================
 
-def _update_stock(item_id, model_id, new_stock):
+def _update_stock(product_id, sku_id, warehouse_id, new_stock):
     """
-    Updates the stock on Shopee for a given item or variant.
+    PUT /product/202309/products/{product_id}/inventory/update.
 
-    For items without variants (model_id is None), we still use the same
-    endpoint but with an empty model_id, which Shopee treats as updating
-    the item-level stock.
+    Per-product endpoint: you can update multiple SKUs of the SAME
+    product in one call, but cannot mix SKUs from different products.
+    For Excel-driven updates, where there's no guarantee that adjacent
+    rows belong to the same product, we just do one SKU per call. That
+    keeps progress output simple and gives clean per-SKU error attribution.
 
     Args:
-      item_id: Shopee's numeric item_id.
-      model_id: Shopee's numeric model_id, or None for non-variant products.
-      new_stock: the absolute stock count to set.
+      product_id:   TikTok product id (string).
+      sku_id:       TikTok SKU id (string).
+      warehouse_id: TikTok warehouse id (string).
+      new_stock:    Absolute stock count to set (int).
 
     Raises:
-      RuntimeError if Shopee returns an error for this specific item.
+      RuntimeError if TikTok returns an error or per-SKU failure.
     """
 
-    path = "/api/v2/product/update_stock"
-
-    stock_info = {
-        "seller_stock": [{"stock": new_stock}],
-    }
-    if model_id is not None:
-        stock_info["model_id"] = model_id
-
+    path = f"/product/{_INVENTORY_API_VERSION}/products/{product_id}/inventory/update"
     body = {
-        "item_id": item_id,
-        "stock_list": [stock_info],
+        "skus": [
+            {
+                "id": sku_id,
+                "inventory": [
+                    {"warehouse_id": warehouse_id, "quantity": new_stock},
+                ],
+            },
+        ],
     }
 
-    data = _call_shopee_post(path, body)
+    response = tiktokshop_client._call_signed("POST", path, body=body)
+    tiktokshop_client._check_ok(response, context=f"update inventory sku={sku_id}")
 
-    # Shopee's update_stock returns a result_list with per-item status.
-    # Check for errors in the result.
-    if data.get("error"):
-        raise RuntimeError(f"{data.get('error')}: {data.get('message')}")
-
-    result_list = data.get("response", {}).get("result_list", [])
-    for r in result_list:
-        if r.get("fail_error"):
-            raise RuntimeError(
-                f"{r.get('fail_error')}: {r.get('fail_message')}"
-            )
-
-
-# ============================================================
-# Signed API call helpers
-# ============================================================
-
-def _call_shopee_get(path, params):
-    """Signed GET returning parsed JSON."""
-    url = _build_signed_url(path)
-    response = requests.get(url, params=params, timeout=30)
-    response.raise_for_status()
-    return response.json()
-
-
-def _call_shopee_post(path, body):
-    """Signed POST returning parsed JSON."""
-    url = _build_signed_url(path)
-    response = requests.post(url, json=body, timeout=30)
-    response.raise_for_status()
-    return response.json()
-
-
-def _build_signed_url(path):
-    """Constructs the signed Shopee URL with all required query parameters."""
-
-    access_token = shopee_auth.get_valid_access_token()
-    timestamp = int(time.time())
-
-    base_string = (
-        f"{config.SHOPEE_PARTNER_ID}{path}{timestamp}"
-        f"{access_token}{config.SHOPEE_SHOP_ID}"
-    )
-    signature = hmac.new(
-        config.SHOPEE_PARTNER_KEY.encode("utf-8"),
-        base_string.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-    return (
-        f"{config.SHOPEE_API_BASE_URL}{path}"
-        f"?partner_id={config.SHOPEE_PARTNER_ID}"
-        f"&timestamp={timestamp}"
-        f"&access_token={access_token}"
-        f"&shop_id={config.SHOPEE_SHOP_ID}"
-        f"&sign={signature}"
-    )
+    # Even with code=0, TikTok may report per-SKU failures inside data.
+    # Field name has shifted across spec revisions; check both.
+    data = response.json().get("data") or {}
+    failures = data.get("errors") or data.get("failed_skus") or []
+    if failures:
+        raise RuntimeError(f"per-sku failures: {failures}")
 
 
 if __name__ == "__main__":
