@@ -1,60 +1,89 @@
 """
 update_inventory.py
 -------------------
-Updates TikTok Shop inventory from an Excel file.
+Updates TikTok Shop inventory from an Excel file, with pack-size variant
+rebalancing.
 
-What this script does:
-  1. Reads an Excel file with two columns: SKU and Stock.
-  2. Paginates POST /product/202502/products/search. The 202502 search
-     response includes the full SKU detail inline (id, seller_sku,
-     inventory[]), so one paginated call gives us everything we need
-     to build the SKU lookup. No per-product detail call required.
-  3. Builds a lookup map: seller_sku -> [list of (product_id, sku_id,
-     warehouse_id)]. The list matters: shared SKUs like packaging or
-     accessories live on many products, and we want to update ALL of
-     them when the warehouse sets a new stock count.
-  4. For each SKU in your Excel, calls PUT update inventory once per
-     product that carries that SKU.
-  5. Prints a summary of what succeeded, failed, or was skipped.
+Background:
+  TikTok Shop caps a single buyer's purchase at 20 units per SKU. To sell
+  larger quantities of small components (capacitors, LEDs, etc.), the shop
+  publishes multiple SKU variants of the SAME product, each representing
+  a bundle size:
+    - ITBISA-KAPASITOR-ELCO-2200UF-25V         (1 piece per unit)
+    - 20PCS-ITBISA-KAPASITOR-ELCO-2200UF-25V   (20 pieces per unit)
+    - 500PCS-ITBISA-KAPASITOR-ELCO-2200UF-25V  (500 pieces per unit)
+
+  This script translates ONE warehouse stock count (in actual pieces) into
+  per-variant unit counts that, when multiplied out, sum back to the
+  original piece count.
+
+What the operator does:
+  Provides an Excel sheet with two columns: SKU and Stock.
+    - SKU should always be the BASE SKU (the 1-piece variant).
+    - Stock is the absolute number of physical pieces in the warehouse.
+    - Pack-size variants in Excel (e.g. "20PCS-...") are skipped with a
+      warning; the base SKU drives the rebalance for all variants.
+
+Allocation rule (per product):
+  Given total_pieces P and N pack-size variants:
+    1. share = P // N pieces per variant.
+    2. units = share // multiplier (rounded down) for each variant.
+    3. remainder = P - sum(units * multiplier).
+    4. The SMALLEST pack size absorbs (remainder // smallest_multiplier)
+       extra units. Anything below the smallest multiplier is lost (e.g.
+       3 leftover pieces with no 1pc variant cannot be allocated).
+
+  Example: P=3000, variants {1, 20, 500} on one product:
+    share = 1000 pcs/variant
+      1pc:   1000 // 1   = 1000 units (= 1000 pcs)
+      20pc:  1000 // 20  =   50 units (= 1000 pcs)
+      500pc: 1000 // 500 =    2 units (= 1000 pcs)
+    Total represented = 3000, remainder = 0. ✓
+
+  Example: P=100, variants {1, 20, 500}:
+    share = 33 pcs/variant
+      1pc:   33 units (= 33 pcs)
+      20pc:  1  unit  (= 20 pcs)
+      500pc: 0  units (= 0 pcs)
+    Represented = 53, remainder = 47 → 47 extra units to 1pc.
+    Final 1pc = 80, total = 80 + 20 + 0 = 100 pcs. ✓
+
+Algorithm note for non-variant SKUs:
+  An ordinary SKU (e.g. ITBISA-BUBBLE-WRAP) becomes a single "variant"
+  with multiplier=1. The allocation reduces to: set its stock to the
+  Excel value. So one code path handles both shapes.
 
 APIs used:
   POST /product/202502/products/search                              (read)
-  PUT  /product/202309/products/{product_id}/inventory/update       (write)
+  POST /product/202309/products/{product_id}/inventory/update       (write)
 
   Both are NEW (post-September 2023) TikTok Shop Open API endpoints.
-  Legacy /api/products/* endpoints are not used. The search endpoint is
-  intentionally on 202502 because that version returns full SKU detail
-  in the search response, eliminating the need for per-product fetches.
+  202502 search inlines full SKU detail (id, seller_sku, inventory[]),
+  so one paginated walk replaces the legacy detail-per-product flow.
   The signed `version` query param must match the path version, so we
   override the client default (202309) for the search call only.
 
+Per-product batching:
+  All variants of a given base SKU live on the same product, so each
+  rebalance is one PUT call carrying multiple SKUs in the body (TikTok
+  allows multi-SKU update as long as all SKUs belong to one product).
+  Compared to per-SKU calls, this cuts API volume by roughly the
+  variant-count factor.
+
 Excel format expected:
-  - Row 1: headers "SKU" and "Stock" (column order matters, header text
-    is ignored)
-  - Subsequent rows: one SKU per row
-  Example:
-    SKU                              | Stock
-    ITBISA-LED-5MM-RED               | 100
-    ITBISA-BUBBLE-WRAP               | 0    ← will zero on every product
-                                              that uses this SKU
+  Row 1: headers "SKU" and "Stock" (column order matters; header text
+  is ignored).
+  Subsequent rows: one base SKU per row.
+    SKU                                | Stock
+    ITBISA-KAPASITOR-ELCO-2200UF-25V   | 3000
+    ITBISA-BUBBLE-WRAP                 | 0      (no variants → set as-is)
+    20PCS-ITBISA-KAPASITOR-ELCO-...    | 50     (skipped with warning)
 
 Usage:
   python scripts/update_inventory.py path/to/inventory.xlsx
-
-Important notes:
-  - SKUs not found in the TikTok Shop catalog are skipped with a warning.
-    The run continues for other SKUs.
-  - When one Excel SKU appears on N products (e.g. shared packaging),
-    we issue N PUT calls, one per product. The progress output shows
-    the product_id for each call so you can audit what was touched.
-  - Update Inventory is a per-product call (not bulk across products),
-    so the per-product fan-out is unavoidable. We delay between calls
-    to stay polite to TikTok's documented 20 QPS cap.
-  - The warehouse_id is auto-detected from each SKU's existing inventory
-    record. Multi-warehouse shops will only have the FIRST warehouse
-    updated; revisit this if the warehouse later moves to having multiple.
 """
 
+import re
 import sys
 import time
 from pathlib import Path
@@ -79,9 +108,15 @@ _SEARCH_PAGE_SIZE = 100
 _SEARCH_API_VERSION = "202502"
 _INVENTORY_API_VERSION = "202309"
 
+# Pack-size variant pattern: "<digits>PCS-<base_sku>".
+# Match must be exact and case-sensitive. "20PCS-X" → base "X", multiplier 20.
+# A SKU that doesn't match (or matches with multiplier 0) is treated as a
+# non-variant with implied multiplier 1.
+_VARIANT_PATTERN = re.compile(r"^(\d+)PCS-(.+)$")
+
 
 def main():
-    """Entry point: read Excel, fetch mappings, update each SKU."""
+    """Entry point: read Excel, rebalance pack-size variants, update each product."""
 
     if len(sys.argv) < 2:
         print("Usage: python scripts/update_inventory.py path/to/inventory.xlsx")
@@ -93,79 +128,98 @@ def main():
         sys.exit(1)
 
     print("=" * 60)
-    print("TikTok Shop Inventory Update")
+    print("TikTok Shop Inventory Update (with pack-size rebalancing)")
     print("=" * 60)
     print(f"App key:    {config.TIKTOKSHOP_APP_KEY}")
     print(f"Shop ID:    {config.TIKTOKSHOP_SHOP_ID}")
     print(f"Excel file: {excel_path}")
     print()
 
-    # STEP 1: Read the Excel file into a dict of SKU -> desired stock.
+    # STEP 1: Read the Excel file. Variant-pattern SKUs are filtered out
+    # here; the base SKU drives all variant updates.
     print("[1/4] Reading Excel file...")
-    desired_stock = _read_excel(excel_path)
-    print(f"  Found {len(desired_stock)} unique SKUs to process")
+    desired_stock, skipped_variants = _read_excel(excel_path)
+    print(f"  Found {len(desired_stock)} base SKU(s) to process")
+    if skipped_variants:
+        print(f"  Skipped {len(skipped_variants)} variant-pattern row(s):")
+        for sku in skipped_variants:
+            print(f"    - {sku}  (use base SKU instead; variants auto-rebalance)")
     print()
 
-    # STEP 2: Walk the entire catalog in one paginated call series and
-    # build the seller_sku -> [(product_id, sku_id, warehouse_id), ...] map.
+    # STEP 2: Walk the catalog and group SKUs by (product, base).
     print("[2/4] Fetching product catalog from TikTok Shop...")
-    sku_to_targets = _build_sku_mapping()
-    total_targets = sum(len(t) for t in sku_to_targets.values())
+    base_to_products = _build_base_sku_mapping()
+    total_groupings = sum(len(p) for p in base_to_products.values())
     print(
-        f"  Mapped {len(sku_to_targets)} unique seller_skus "
-        f"across {total_targets} product/sku rows"
+        f"  Mapped {len(base_to_products)} base SKU(s) "
+        f"across {total_groupings} product grouping(s)"
     )
     print()
 
-    # STEP 3: Match each Excel SKU to its TikTok Shop ids. One Excel
-    # row may expand into multiple update jobs if the SKU is shared
-    # across products (very common for packaging/accessory SKUs).
-    print("[3/4] Matching Excel SKUs to TikTok Shop SKUs...")
-    matched = []
+    # STEP 3: Match Excel rows to catalog and compute per-variant allocations.
+    print("[3/4] Matching Excel SKUs and computing allocations...")
+    jobs = []
     missing = []
     for sku, stock in desired_stock.items():
-        targets = sku_to_targets.get(sku, [])
-        if not targets:
+        product_entries = base_to_products.get(sku, [])
+        if not product_entries:
             missing.append(sku)
             continue
-        for product_id, sku_id, warehouse_id in targets:
-            matched.append((sku, stock, product_id, sku_id, warehouse_id))
+
+        for entry in product_entries:
+            allocations = _allocate_stock(stock, entry["variants"])
+            jobs.append({
+                "base_sku": sku,
+                "total_stock": stock,
+                "product_id": entry["product_id"],
+                "allocations": allocations,
+            })
 
     matched_excel_skus = len(desired_stock) - len(missing)
     print(f"  Excel SKUs matched: {matched_excel_skus}")
     print(f"  Excel SKUs missing: {len(missing)}")
-    print(f"  Total update calls planned: {len(matched)}")
+    print(f"  Total update calls planned: {len(jobs)}  (1 call per product)")
     if missing:
-        print("  Missing SKUs (not found on TikTok Shop, will be skipped):")
+        print("  Missing SKUs (no base or variants found in catalog):")
         for sku in missing:
             print(f"    - {sku}")
 
-    # Show fan-out so the operator notices when a SKU touches many products.
+    # Show fan-out so the operator notices when a base SKU touches many products.
     fanned_out = [
-        (sku, len(sku_to_targets[sku]))
+        (sku, len(base_to_products[sku]))
         for sku in desired_stock
-        if len(sku_to_targets.get(sku, [])) > 1
+        if len(base_to_products.get(sku, [])) > 1
     ]
     if fanned_out:
-        print("  SKUs that exist on multiple products (each will be updated):")
+        print("  Base SKUs that exist on multiple products (each rebalanced independently):")
         for sku, count in fanned_out:
             print(f"    - {sku}: {count} products")
     print()
 
-    if not matched:
+    if not jobs:
         print("Nothing to update. Exiting.")
         return
 
-    # STEP 4: Update each matched SKU's stock on TikTok Shop.
-    print(f"[4/4] Issuing {len(matched)} update call(s)...")
+    # STEP 4: Push allocations to TikTok Shop, one PUT per product.
+    print(f"[4/4] Issuing {len(jobs)} update call(s)...")
     success_count = 0
     failed = []
-    for sku, stock, product_id, sku_id, warehouse_id in matched:
-        label = f"{sku} (product {product_id})"
+    for job in jobs:
+        label = f"{job['base_sku']} (product {job['product_id']})"
         try:
-            _update_stock(product_id, sku_id, warehouse_id, stock)
+            sku_updates = [
+                (v["sku_id"], v["warehouse_id"], units)
+                for v, units in job["allocations"]
+            ]
+            _update_stock_batch(job["product_id"], sku_updates)
             success_count += 1
-            print(f"  ✓ {label}: set stock to {stock}")
+            print(f"  ✓ {label}: {job['total_stock']} pcs")
+            for variant, units in job["allocations"]:
+                pcs = units * variant["multiplier"]
+                print(
+                    f"      {variant['seller_sku']}: "
+                    f"{units} units × {variant['multiplier']}pc = {pcs} pcs"
+                )
         except Exception as e:
             failed.append((label, str(e)))
             print(f"  ✗ {label}: failed - {e}")
@@ -192,16 +246,20 @@ def main():
 
 def _read_excel(path):
     """
-    Reads the Excel file and returns a dict of SKU -> stock.
+    Reads the Excel file and returns (desired_stock, skipped_variants).
+      desired_stock:    dict of base_sku -> stock (int)
+      skipped_variants: list of variant-pattern SKUs that were filtered out
 
-    Expects the first row to be headers and the first two columns to
-    contain SKU and Stock. Rows where SKU is empty are skipped.
+    Variant-pattern SKUs (matching `<N>PCS-<...>`) are skipped with a
+    warning so the operator can fix the Excel file. Base SKUs drive the
+    rebalance across all variants automatically.
     """
 
     workbook = openpyxl.load_workbook(path, data_only=True)
     sheet = workbook.active
 
     result = {}
+    skipped_variants = []
     for row_num, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
         if not row or len(row) < 2:
             continue
@@ -213,6 +271,16 @@ def _read_excel(path):
             continue
 
         sku = str(sku_raw).strip()
+
+        # Reject variant-pattern SKUs early: the operator should provide
+        # the BASE SKU and let this script fan out to variants.
+        if _VARIANT_PATTERN.match(sku):
+            print(
+                f"  Row {row_num}: SKU '{sku}' looks like a pack-size variant; "
+                f"skipping (provide the base SKU instead)"
+            )
+            skipped_variants.append(sku)
+            continue
 
         try:
             stock = int(stock_raw)
@@ -233,32 +301,47 @@ def _read_excel(path):
             )
         result[sku] = stock
 
-    return result
+    return result, skipped_variants
 
 
 # ============================================================
 # TikTok Shop product catalog fetching (NEW API 202502 search)
 # ============================================================
 
-def _build_sku_mapping():
+def _parse_sku(seller_sku):
     """
-    Returns dict: seller_sku -> [list of (product_id, sku_id, warehouse_id)].
+    Returns (base_sku, multiplier) for a seller SKU string.
 
-    Why a list and not a single tuple:
-      Some SKUs (packaging, accessories, common components) live on many
-      products. When the warehouse says "ITBISA-BUBBLE-WRAP = 0", they
-      mean every product that uses that SKU goes to 0, not just one
-      arbitrary product. The list captures every (product, sku, warehouse)
-      target so the caller can update all of them.
+    Recognised variant pattern: "<digits>PCS-<base_sku>", case-sensitive.
+    Anything else is its own base with multiplier 1. Multiplier 0 is
+    treated as "not a variant" to avoid divide-by-zero downstream.
+    """
+    m = _VARIANT_PATTERN.match(seller_sku)
+    if m:
+        multiplier = int(m.group(1))
+        if multiplier > 0:
+            return m.group(2), multiplier
+    return seller_sku, 1
 
-    Implementation note:
-      The 202502 search response embeds skus[] inline, so this function
-      reads the entire catalog in one paginated walk and never needs
-      a per-product detail call. ~2 API calls for 118 products vs.
-      ~120 calls under the old 202309 detail-per-product flow.
+
+def _build_base_sku_mapping():
+    """
+    Returns dict mapping base_sku -> list of:
+        {
+          "product_id": str,
+          "variants": [
+            {"multiplier": int, "sku_id": str, "warehouse_id": str, "seller_sku": str},
+            ... sorted ascending by multiplier
+          ]
+        }
+
+    Variants are grouped per (base_sku, product_id) so each PUT call
+    targets a single product (TikTok's update endpoint cannot mix SKUs
+    from multiple products).
     """
 
-    sku_to_targets = {}
+    # First pass: build product_id -> {base_sku -> [variant dicts]}.
+    catalog = {}
     page_token = None
     page_num = 0
     products_seen = 0
@@ -272,15 +355,14 @@ def _build_sku_mapping():
         if page_token:
             extra_query["page_token"] = page_token
 
-        # Body intentionally empty — matches your working curl. Adding a
+        # Body intentionally empty — matches the working curl. Adding a
         # status filter here is supported but unnecessary; we want
         # everything in the catalog so the warehouse can update any SKU.
-        body = {}
         response = tiktokshop_client._call_signed(
             "POST",
             "/product/202502/products/search",
             extra_query=extra_query,
-            body=body,
+            body={"status": "ACTIVATE"},
         )
         tiktokshop_client._check_ok(response, context="product search")
 
@@ -310,9 +392,15 @@ def _build_sku_mapping():
                 if not warehouse_id:
                     continue
 
-                sku_to_targets.setdefault(seller_sku, []).append(
-                    (product_id, sku_id, warehouse_id)
-                )
+                base_sku, multiplier = _parse_sku(seller_sku)
+
+                product_groups = catalog.setdefault(product_id, {})
+                product_groups.setdefault(base_sku, []).append({
+                    "multiplier": multiplier,
+                    "sku_id": sku_id,
+                    "warehouse_id": warehouse_id,
+                    "seller_sku": seller_sku,
+                })
 
         page_token = payload.get("next_page_token") or ""
         print(f"  Page {page_num}: {len(products)} products (running total: {products_seen})")
@@ -321,28 +409,80 @@ def _build_sku_mapping():
 
         time.sleep(0.3)  # Be polite between pages.
 
-    return sku_to_targets
+    # Second pass: invert to base_sku -> [{product_id, variants}].
+    # Sort variants ascending by multiplier so allocation can put any
+    # remainder onto the smallest pack size by indexing [0].
+    base_to_products = {}
+    for product_id, groups in catalog.items():
+        for base_sku, variants in groups.items():
+            variants.sort(key=lambda v: v["multiplier"])
+            base_to_products.setdefault(base_sku, []).append({
+                "product_id": product_id,
+                "variants": variants,
+            })
+
+    return base_to_products
 
 
 # ============================================================
-# Inventory update (NEW API 202309)
+# Stock allocation across pack-size variants
 # ============================================================
 
-def _update_stock(product_id, sku_id, warehouse_id, new_stock):
+def _allocate_stock(total_pieces, variants):
     """
-    PUT /product/202309/products/{product_id}/inventory/update.
+    Distributes total_pieces across pack-size variants.
+
+    Returns a list of (variant_dict, units_to_set) tuples in the same
+    order as the input variants (which must be sorted ascending by
+    multiplier).
+
+    Algorithm:
+      share     = total_pieces // N         # pieces per variant
+      units     = share // multiplier       # whole units per pack size
+      remainder = total_pieces - sum(units * multiplier)
+      Smallest variant absorbs (remainder // smallest.multiplier) extra units.
+
+    A variant whose multiplier exceeds the share simply gets 0 units;
+    those unfilled pieces flow to the smallest pack size as remainder.
+    """
+    n = len(variants)
+    if n == 0:
+        return []
+
+    share = total_pieces // n
+
+    allocations = []
+    represented = 0
+    for variant in variants:
+        units = share // variant["multiplier"]
+        allocations.append([variant, units])
+        represented += units * variant["multiplier"]
+
+    # Push leftover pieces to the smallest pack size (variants[0] after sort).
+    remainder = total_pieces - represented
+    if remainder > 0:
+        smallest = allocations[0][0]
+        extra_units = remainder // smallest["multiplier"]
+        allocations[0][1] += extra_units
+
+    return [(v, u) for v, u in allocations]
+
+
+# ============================================================
+# Inventory update (NEW API 202309), batched per product
+# ============================================================
+
+def _update_stock_batch(product_id, sku_updates):
+    """
+    POST /product/202309/products/{product_id}/inventory/update.
 
     Per-product endpoint: you can update multiple SKUs of the SAME
-    product in one call, but cannot mix SKUs from different products.
-    For Excel-driven updates, where there's no guarantee that adjacent
-    rows belong to the same product, we just do one SKU per call. That
-    keeps progress output simple and gives clean per-SKU error attribution.
+    product in one call, which is exactly what pack-size rebalancing
+    needs (all variants of one base SKU live on one product).
 
     Args:
-      product_id:   TikTok product id (string).
-      sku_id:       TikTok SKU id (string).
-      warehouse_id: TikTok warehouse id (string).
-      new_stock:    Absolute stock count to set (int).
+      product_id:  TikTok product id (string).
+      sku_updates: list of (sku_id, warehouse_id, quantity) tuples.
 
     Raises:
       RuntimeError if TikTok returns an error or per-SKU failure.
@@ -353,15 +493,14 @@ def _update_stock(product_id, sku_id, warehouse_id, new_stock):
         "skus": [
             {
                 "id": sku_id,
-                "inventory": [
-                    {"warehouse_id": warehouse_id, "quantity": new_stock},
-                ],
-            },
+                "inventory": [{"warehouse_id": warehouse_id, "quantity": quantity}],
+            }
+            for sku_id, warehouse_id, quantity in sku_updates
         ],
     }
 
     response = tiktokshop_client._call_signed("POST", path, body=body)
-    tiktokshop_client._check_ok(response, context=f"update inventory sku={sku_id}")
+    tiktokshop_client._check_ok(response, context=f"update inventory product={product_id}")
 
     # Even with code=0, TikTok may report per-SKU failures inside data.
     # Field name has shifted across spec revisions; check both.
