@@ -80,7 +80,7 @@ Excel format expected:
     20PCS-ITBISA-KAPASITOR-ELCO-...    | 50     (skipped with warning)
 
 Usage:
-  python scripts/update_inventory.py path/to/inventory.xlsx
+  python scripts/update_inventory.py path/to/tiktokshop_inventory.xlsx
 """
 
 import re
@@ -119,7 +119,7 @@ def main():
     """Entry point: read Excel, rebalance pack-size variants, update each product."""
 
     if len(sys.argv) < 2:
-        print("Usage: python scripts/update_inventory.py path/to/inventory.xlsx")
+        print("Usage: python scripts/update_inventory.py path/to/tiktokshop_inventory.xlsx")
         sys.exit(1)
 
     excel_path = Path(sys.argv[1])

@@ -253,7 +253,7 @@ This script updates Shopee inventory from an Excel file.
 Usage:
 
 ```bash
-python scripts/update_inventory.py path/to/inventory.xlsx
+python scripts/update_inventory.py path/to/tiktokshop_inventory.xlsx
 ```
 
 Expected Excel columns:

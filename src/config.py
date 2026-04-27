@@ -36,7 +36,7 @@ TIKTOKSHOP_AUTH_BASE_URL = "https://auth.tiktok-shops.com"
 TIKTOKSHOP_OPEN_API_BASE_URL = "https://open-api.tiktokglobalshop.com"
 
 # Document type passed to Get Package Shipping Document.
-TIKTOKSHOP_DOCUMENT_TYPE = "PACKING_SLIP"
+TIKTOKSHOP_DOCUMENT_TYPE = "SHIPPING_LABEL"
 
 
 # File paths for runtime state.
