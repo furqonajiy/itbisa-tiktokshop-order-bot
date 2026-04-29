@@ -152,11 +152,11 @@ def build_caption(order):
 def build_summary(time_hhmm, success_count, skipped_count):
     """Heartbeat message in Bahasa Indonesia."""
     if success_count == 0 and skipped_count == 0:
-        return f"✅ Tiktok Shop - {time_hhmm} - Tidak ada pesanan baru"
+        return f"✅ TikTok Shop - {time_hhmm} - Tidak ada pesanan baru"
     if skipped_count == 0:
-        return f"✅ Tiktok Shop - {time_hhmm} - {success_count} label terkirim"
+        return f"✅ TikTok Shop - {time_hhmm} - {success_count} label terkirim"
     return (
-        f"⚠️ Tiktok Shop - {time_hhmm} - {success_count} terkirim, "
+        f"⚠️ TikTok Shop - {time_hhmm} - {success_count} terkirim, "
         f"{skipped_count} gagal (akan dicoba lagi)"
     )
 
