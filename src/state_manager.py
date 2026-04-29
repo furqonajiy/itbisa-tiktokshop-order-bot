@@ -1,18 +1,18 @@
 """
 state_manager.py
 ----------------
-Loads and saves the JSON file that remembers which orders we already processed.
+Loads and saves the JSON file that remembers which packages we already processed.
 
 Why this file exists:
   Every GitHub Actions run starts on a fresh machine with no memory of previous
   runs. To avoid sending the same shipping label twice, we save a small JSON
-  file that maps each processed order_id to the timestamp when we processed it.
-  This file is committed back to the repo at the end of each successful run.
+  file that maps each processed package_id to the timestamp when we processed it.
+  This file is committed back to the repo at the end of each workflow run.
 
 The file format looks like this:
   {
-    "ORDER_ABC123": "2026-04-18T10:00:00+00:00",
-    "ORDER_XYZ789": "2026-04-18T11:00:00+00:00"
+    "PACKAGE_ABC123": "2026-04-18T10:00:00+00:00",
+    "PACKAGE_XYZ789": "2026-04-18T11:00:00+00:00"
   }
 """
 
@@ -31,7 +31,7 @@ def load():
     no point remembering them forever.
 
     Returns:
-      dict mapping order_id (str) -> processed_at_iso_timestamp (str)
+      dict mapping package_id (str) -> processed_at_iso_timestamp (str)
     """
 
     # STEP 1: If the file does not exist yet (first ever run), return empty dict.
@@ -45,10 +45,10 @@ def load():
     # STEP 3: Remove entries older than the retention period.
     cutoff = datetime.now(timezone.utc) - timedelta(days=config.STATE_RETENTION_DAYS)
     pruned_state = {}
-    for order_id, processed_at_iso in state.items():
+    for package_id, processed_at_iso in state.items():
         processed_at = datetime.fromisoformat(processed_at_iso)
         if processed_at >= cutoff:
-            pruned_state[order_id] = processed_at_iso
+            pruned_state[package_id] = processed_at_iso
 
     # STEP 4: Return the cleaned-up dictionary.
     return pruned_state
@@ -62,7 +62,7 @@ def save(state):
     happens later in the GitHub Actions workflow, not here.
 
     Args:
-      state: dict mapping order_id -> processed_at_iso_timestamp
+      state: dict mapping package_id -> processed_at_iso_timestamp
     """
 
     # STEP 1: Make sure the data folder exists.
@@ -78,7 +78,7 @@ def now_iso():
     Returns the current UTC time as an ISO 8601 string.
 
     We put this here because state_manager is the only module that cares
-    about timestamps for processed orders.
+    about timestamps for processed packages.
     """
     return datetime.now(timezone.utc).isoformat()
 
