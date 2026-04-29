@@ -25,10 +25,10 @@ from src import config
 
 def load():
     """
-    Loads the processed orders dictionary from disk.
+    Loads the processed packages dictionary from disk.
 
-    Also prunes any entries older than STATE_RETENTION_DAYS, because there is
-    no point remembering them forever.
+    Also prunes any entries older than STATE_RETENTION_DAYS, because airway
+    bills are no longer useful after the expiry window.
 
     Returns:
       dict mapping package_id (str) -> processed_at_iso_timestamp (str)
@@ -56,7 +56,7 @@ def load():
 
 def save(state):
     """
-    Writes the processed orders dictionary to disk.
+    Writes the processed packages dictionary to disk.
 
     Note: this function only writes the file. The git commit and push
     happens later in the GitHub Actions workflow, not here.

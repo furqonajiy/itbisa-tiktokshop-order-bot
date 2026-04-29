@@ -145,6 +145,9 @@ def _do_run():
             print("  ✗ Telegram delivery failed. Will retry next run.")
             skipped_count += 1
 
+    # Save once more at the end so pruning from state_manager.load()
+    # is persisted even when every new package was skipped.
+    state_manager.save(processed)
     print("\nState saved.")
 
     summary = telegram_sender.build_summary(

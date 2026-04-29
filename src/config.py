@@ -47,5 +47,5 @@ TOKENS_FILE_PATH = str(PROJECT_ROOT / "data" / "tiktokshop_tokens.json")
 # Behavior constants.
 MAX_ORDERS_PER_RUN = 30             # Safety cap; stop and alert if exceeded.
 LABEL_IMAGE_DPI = 200               # Resolution for PDF -> PNG conversion.
-STATE_RETENTION_DAYS = 2            # How long to remember processed packages.
+STATE_RETENTION_DAYS = 3            # How long to remember processed packages.
 TOKEN_REFRESH_BUFFER_MINUTES = 10   # Refresh access_token N min before expiry.
