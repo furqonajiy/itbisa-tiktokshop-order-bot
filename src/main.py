@@ -133,12 +133,14 @@ def _do_run():
         caption = telegram_sender.build_caption(order)
         delivered = telegram_sender.send_label(png_pages, caption)
 
-        # Only mark processed AFTER Telegram confirms delivery.
+        # Only mark and save processed AFTER Telegram confirms delivery.
+        # Save immediately after each successful label so partial progress
+        # survives even if a later package crashes before the final save.
         if delivered:
             processed[package_id] = state_manager.now_iso()
             state_manager.save(processed)
             success_count += 1
-            print("  ✓ Sent to Telegram and marked as processed")
+            print("  ✓ Sent to Telegram, saved state, and marked as processed")
         else:
             print("  ✗ Telegram delivery failed. Will retry next run.")
             skipped_count += 1
