@@ -154,9 +154,9 @@ def build_summary(time_hhmm, success_count, skipped_count):
     if success_count == 0 and skipped_count == 0:
         return f"✅ Tiktok Shop - {time_hhmm} - Tidak ada pesanan baru"
     if skipped_count == 0:
-        return f"✅ {time_hhmm} - {success_count} label terkirim"
+        return f"✅ Tiktok Shop - {time_hhmm} - {success_count} label terkirim"
     return (
-        f"⚠️ {time_hhmm} - {success_count} terkirim, "
+        f"⚠️ Tiktok Shop - {time_hhmm} - {success_count} terkirim, "
         f"{skipped_count} gagal (akan dicoba lagi)"
     )
 
