@@ -161,9 +161,9 @@ def build_summary(time_hhmm, success_count, skipped_count):
     )
 
 
-def build_safety_stop_message(time_hhmm, order_count, max_allowed):
+def build_safety_stop_message(time_hhmm, package_count, max_allowed):
     """Alert when too many new packages appear at once — needs human review."""
     return (
-        f"⚠️ {time_hhmm} - PERINGATAN: {order_count} pesanan baru "
+        f"⚠️ {time_hhmm} - PERINGATAN: {package_count} paket/resi baru "
         f"melebihi batas {max_allowed}. Mohon dicek dahulu sebelum diproses."
     )
