@@ -83,7 +83,7 @@ def _search_orders_by_status(status):
         payload = response.json()["data"]
         all_orders.extend(payload.get("orders", []))
 
-        # TikTok returns an empty string on the last page.
+        # TikTok Shop returns an empty string on the last page.
         page_token = payload.get("next_page_token", "")
         if not page_token:
             break
@@ -122,7 +122,7 @@ def get_waybill_pdf(package_id):
 
     Two steps:
       1. Ask TikTok Shop for a signed doc_url for the PDF.
-      2. Download the PDF from doc_url (no TikTok signing needed; doc_url
+      2. Download the PDF from doc_url (no TikTok Shop signing needed; doc_url
          is already pre-signed).
 
     Returns None if the PDF is still being rendered, so main.py can retry
@@ -131,7 +131,7 @@ def get_waybill_pdf(package_id):
     path = f"/fulfillment/202309/packages/{package_id}/shipping_documents"
     extra_query = {"document_type": config.TIKTOKSHOP_DOCUMENT_TYPE}
 
-    # Retry a few times within this run since TikTok sometimes needs a
+    # Retry a few times within this run since TikTok Shop sometimes needs a
     # moment after batch-ship to finish rendering.
     for attempt in range(3):
         if attempt > 0:
@@ -282,7 +282,7 @@ def _make_signature(path, query_params, body_string):
 
 
 def _check_ok(response, context):
-    """Raises RuntimeError if the response is not a TikTok success."""
+    """Raises RuntimeError if the response is not a TikTok Shop success."""
     if response.status_code != 200:
         raise RuntimeError(f"{context} HTTP {response.status_code}: {response.text}")
 
