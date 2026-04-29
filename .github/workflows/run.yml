@@ -30,6 +30,7 @@ on:
 jobs:
   process-orders:
     runs-on: ubuntu-latest
+
     concurrency:
       group: bot-state-${{ github.repository }}
       cancel-in-progress: false
