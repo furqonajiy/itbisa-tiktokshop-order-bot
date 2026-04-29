@@ -136,13 +136,13 @@ def _do_run():
         # Only mark processed AFTER Telegram confirms delivery.
         if delivered:
             processed[package_id] = state_manager.now_iso()
+            state_manager.save(processed)
             success_count += 1
             print("  ✓ Sent to Telegram and marked as processed")
         else:
             print("  ✗ Telegram delivery failed. Will retry next run.")
             skipped_count += 1
 
-    state_manager.save(processed)
     print("\nState saved.")
 
     summary = telegram_sender.build_summary(
