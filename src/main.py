@@ -51,7 +51,7 @@ def run():
     try:
         _do_run()
     except Exception as e:
-        alert = f"❌ {_now_jakarta_hhmm()} - Bot error: {e}"
+        alert = f"❌ {_now_jakarta_hhmm()} - Error bot TikTok Shop: {e}"
         telegram_sender.send_summary(alert)
         print(f"\n{alert}")
         sys.exit(1)
