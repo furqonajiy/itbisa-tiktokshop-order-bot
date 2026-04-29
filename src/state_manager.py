@@ -45,10 +45,10 @@ def load():
     # STEP 3: Remove entries older than the retention period.
     cutoff = datetime.now(timezone.utc) - timedelta(days=config.STATE_RETENTION_DAYS)
     pruned_state = {}
-    for order_id, processed_at_iso in state.items():
+    for package_id, processed_at_iso in state.items():
         processed_at = datetime.fromisoformat(processed_at_iso)
         if processed_at >= cutoff:
-            pruned_state[order_id] = processed_at_iso
+            pruned_state[package_id] = processed_at_iso
 
     # STEP 4: Return the cleaned-up dictionary.
     return pruned_state
