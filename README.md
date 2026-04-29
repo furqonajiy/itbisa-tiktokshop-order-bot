@@ -204,18 +204,19 @@ TODO
 
 ## Daily schedule
 
-The GitHub Actions workflow currently runs **4 times per day** based on
+The GitHub Actions workflow currently runs **5 times per day** based on
 Jakarta time (WIB = UTC+7):
 
-- **05:00 WIB**
 - **10:00 WIB**
+- **12:00 WIB**
 - **14:00 WIB**
-- **17:00 WIB**
+- **16:00 WIB**
+- **18:00 WIB**
 
 In cron syntax (GitHub Actions uses UTC), this is:
 
 ```text
-0 22,3,7,10 * * *
+0 3,5,7,9,11 * * *
 ```
 
 ## What your employee sees in Telegram
@@ -274,7 +275,7 @@ TODO
 Free forever.
 
 - GitHub Actions: 2000 free minutes per month on private repos. The bot
-  uses roughly 4 runs/day × ~1 minute = about 120 minutes/month.
+  uses roughly 5 runs/day × ~1 minute = about 150 minutes/month.
 - Telegram Bot API: free.
 - Shopee Open API: free.
 - No always-on server costs.
