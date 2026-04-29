@@ -7,7 +7,7 @@ Why this file exists:
   Every GitHub Actions run starts on a fresh machine with no memory of previous
   runs. To avoid sending the same shipping label twice, we save a small JSON
   file that maps each processed package_id to the timestamp when we processed it.
-  This file is committed back to the repo at the end of each successful run.
+  This file is committed back to the repo at the end of each workflow run.
 
 The file format looks like this:
   {
