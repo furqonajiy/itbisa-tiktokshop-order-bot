@@ -58,8 +58,7 @@ def _load_tokens():
 
 def _save_tokens(tokens):
     os.makedirs(os.path.dirname(config.TOKENS_FILE_PATH), exist_ok=True)
-    with open(config.TOKENS_FILE_PATH, "w", encoding="utf-8") as f:
-        json.dump(tokens, f, indent=2, sort_keys=True)
+    _atomic_write_json(config.TOKENS_FILE_PATH, tokens)
 
 
 # ============================================================
@@ -122,3 +121,10 @@ def _refresh_tokens(current_tokens):
 
 def _unix_to_iso(value):
     return datetime.fromtimestamp(int(value), tz=timezone.utc).isoformat()
+
+
+def _atomic_write_json(path, data):
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, sort_keys=True)
+    os.replace(tmp_path, path)

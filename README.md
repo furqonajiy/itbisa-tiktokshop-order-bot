@@ -37,7 +37,7 @@ itbisa-tiktokshop-order-bot/
 │   └── tiktokshop_tokens.json       # Current access + refresh tokens
 ├── scripts/
 │   ├── bootstrap_tokens.py          # One-time script to seed tiktokshop_tokens.json
-│   ├── update_inventory.py          # Utility to update Shopee stock from Excel
+│   ├── update_inventory.py          # Utility to update TikTok Shop stock from Excel
 │   └── test_*.py                    # Helper / diagnostic scripts for API testing
 ├── src/
 │   ├── __init__.py
@@ -45,7 +45,6 @@ itbisa-tiktokshop-order-bot/
 │   ├── config.py                    # Reads secrets + settings from env
 │   ├── tiktokshop_auth.py           # Token lifecycle
 │   ├── tiktokshop_client.py         # TikTok Shop API calls + signing
-│   ├── tiktokshop_client_fake.py    # Canned fake data for local testing
 │   ├── label_processor.py           # PDF → PNG conversion + bottom whitespace crop
 │   ├── telegram_sender.py           # Sends images + messages in Bahasa
 │   └── state_manager.py             # Loads/saves processed_orders.json
@@ -87,8 +86,6 @@ TIKTOKSHOP_SHOP_ID=your_shop_id_here
 
 TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
 TELEGRAM_CHAT_ID=-100123456789
-
-USE_FAKE_TIKTOKSHOP=false
 ```
 
 TikTok Shop tokens are managed in `data/tiktokshop_tokens.json` because they
@@ -110,21 +107,16 @@ python scripts/bootstrap_tokens.py
 
 ## Running locally
 
-### Test with fake data
+### Run with real TikTok Shop
 
-Set `USE_FAKE_TIKTOKSHOP=true` in `.env` and run:
-
-```bash
-python -m src.main
-```
-
-### Test with real TikTok Shop
-
-Set `USE_FAKE_TIKTOKSHOP=false` and run:
+After token bootstrap is complete, run:
 
 ```bash
 python -m src.main
 ```
+
+The bot queries your real TikTok Shop, processes actual packages, downloads
+shipping labels, converts them to images, and sends them to Telegram.
 
 ## Production deployment (GitHub Actions)
 
@@ -153,7 +145,7 @@ source of truth for runtime state.
 
 ### 4. Verify the workflow runs
 
-Go to the **Actions** tab, click **Run Shopee Order Bot** in the sidebar,
+Go to the **Actions** tab, click **Run TikTok Shop Order Bot** in the sidebar,
 then click **Run workflow** to trigger a manual test run. Watch the logs
 to confirm everything works. You should see a heartbeat message arrive
 in your Telegram chat within a minute.
@@ -232,7 +224,7 @@ Barang:
 ```
 
 The caption uses SKU instead of the product name because product names
-on Shopee are very long, while SKUs are short and match how the warehouse
+on TikTok Shop are very long, while SKUs are short and match how the warehouse
 is organized. When a product has variants, the variant SKU is shown.
 When a product has no variants, the main product SKU is shown.
 
@@ -248,7 +240,7 @@ If the refresh token expires, a rare manual-intervention alert appears.
 
 ### `scripts/update_inventory.py`
 
-This script updates Shopee inventory from an Excel file.
+This script updates TikTok Shop inventory from an Excel file.
 
 Usage:
 
@@ -261,9 +253,8 @@ Expected Excel columns:
 - `SKU`
 - `Stock`
 
-It fetches your product catalog, maps SKUs to Shopee item/model IDs, then
-updates stock one SKU at a time with a small delay to stay polite to
-Shopee's rate limits.
+It fetches your product catalog, maps SKUs to TikTok Shop product/SKU IDs, then
+updates stock with a small delay to stay polite to TikTok Shop's rate limits.
 
 ## Troubleshooting
 
@@ -276,7 +267,7 @@ Free forever.
 - GitHub Actions: 2000 free minutes per month on private repos. The bot
   uses roughly 4 runs/day × ~1 minute = about 120 minutes/month.
 - Telegram Bot API: free.
-- Shopee Open API: free.
+- TikTok Shop Open API: free.
 - No always-on server costs.
 
 ## Important note
