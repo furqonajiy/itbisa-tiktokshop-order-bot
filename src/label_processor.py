@@ -1,24 +1,75 @@
 """
 label_processor.py
 ------------------
-Converts a shipping label PDF into PNG image bytes.
+Converts a shipping label PDF into Telegram-ready PNG image bytes.
 
 The employee prefers images over PDFs because Telegram handles them well on
 mobile and Epson iPrint can print them directly. This module is pure local
 computation — no network calls.
+
+Multi-page behavior:
+  - A 1-page PDF becomes 1 image.
+  - A 2-page PDF becomes 1 merged image.
+  - A 3-page PDF becomes 2 images: pages 1-2 merged, page 3 alone.
+  - A 4-page PDF becomes 2 merged images, and so on.
 """
 
 import io
 
+from PIL import Image
 from pdf2image import convert_from_bytes
 
 from src import config
 
 
+_MERGED_PAGE_GAP_PX = 12
+
+
 def pdf_to_pngs(pdf_bytes):
-    """Converts every page of a PDF into PNG bytes, returned as a list."""
+    """Converts every PDF page into Telegram-ready PNG images.
+
+    Every 2 PDF pages are merged into 1 image before sending to Telegram.
+    This reduces message count for multi-page labels without changing the
+    original page order.
+    """
     images = convert_from_bytes(pdf_bytes, dpi=config.LABEL_IMAGE_DPI)
-    return [_image_to_png_bytes(_crop_bottom_whitespace(image)) for image in images]
+    cropped_images = [_crop_bottom_whitespace(image) for image in images]
+    merged_images = _merge_pages_every_two(cropped_images)
+    return [_image_to_png_bytes(image) for image in merged_images]
+
+
+def _merge_pages_every_two(images):
+    """Groups rendered PDF pages into Telegram images, two pages per image."""
+    merged_images = []
+
+    for start_index in range(0, len(images), 2):
+        merged_images.append(_merge_page_pair(images[start_index:start_index + 2]))
+
+    return merged_images
+
+
+def _merge_page_pair(images):
+    """Stacks up to two rendered PDF pages into one Telegram image.
+
+    We merge vertically so both labels remain readable on mobile and printable
+    from Epson iPrint. Width is centered when the two pages have different
+    sizes. A small white gap separates the labels visually.
+    """
+    if len(images) == 1:
+        return images[0]
+
+    width = max(image.width for image in images)
+    height = sum(image.height for image in images) + _MERGED_PAGE_GAP_PX
+    merged = Image.new("RGB", (width, height), "white")
+
+    y_offset = 0
+    for image in images:
+        image = image.convert("RGB")
+        x_offset = (width - image.width) // 2
+        merged.paste(image, (x_offset, y_offset))
+        y_offset += image.height + _MERGED_PAGE_GAP_PX
+
+    return merged
 
 
 def _crop_bottom_whitespace(image, white_threshold=250, bottom_padding_px=8):

@@ -11,14 +11,15 @@ The flow:
   4. Drop packages we've already processed.
   5. Safety-cap check so we never flood Telegram if something is wrong.
   6. Batch-ship every package whose source order is still AWAITING_SHIPMENT.
-  7. For each new package: download waybill PDF -> convert to PNG(s) -> send
-     to Telegram -> mark processed only AFTER Telegram confirms delivery.
+  7. For each new package: download waybill PDF -> convert to Telegram-ready
+     PNG image(s), merged two pages per image -> send to Telegram -> mark
+     processed only AFTER Telegram confirms delivery.
   8. Save state.
   9. Send a heartbeat summary so the employee knows the bot ran.
 
 We track package_id (not order_id) because each package gets its own waybill
 and its own Telegram send. An order with multiple packages produces multiple
-Telegram messages.
+Telegram label deliveries.
 """
 
 import sys
@@ -127,8 +128,11 @@ def _do_run():
             skipped_count += 1
             continue
 
+        # Convert the PDF into Telegram-ready PNG images. Multiple PDF pages
+        # are merged two pages per image to reduce Telegram messages while
+        # keeping the label order unchanged.
         png_pages = label_processor.pdf_to_pngs(pdf_bytes)
-        print(f"  Rendered {len(png_pages)} waybill page(s) from PDF")
+        print(f"  Rendered {len(png_pages)} Telegram waybill image(s) from PDF")
 
         caption = telegram_sender.build_caption(order)
         delivered = telegram_sender.send_label(png_pages, caption)
