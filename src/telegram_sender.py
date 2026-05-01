@@ -38,10 +38,11 @@ _TELEGRAM_API_URL = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}"
 # ============================================================
 
 def send_label(png_pages, caption):
-    """Sends one or more label images. Returns True only if all pages delivered.
+    """Sends one or more label images. Returns True only if all delivered.
 
     main.py uses the return value to decide whether to mark a package as
-    processed, so we return bool rather than raising.
+    processed, so we return bool rather than raising. Multi-page PDFs are
+    already merged by label_processor into two PDF pages per Telegram image.
     """
     if isinstance(png_pages, (bytes, bytearray)):
         png_pages = [bytes(png_pages)]
@@ -56,12 +57,12 @@ def send_label(png_pages, caption):
     total = len(png_pages)
 
     for index, png_bytes in enumerate(png_pages, start=1):
-        # Full caption on page 1; short page-number label on the rest.
+        # Full caption on image 1; short part-number label on the rest.
         if total > 1:
             if index == 1:
-                page_caption = f"{caption}\n\n🧾 Halaman {index}/{total}"
+                page_caption = f"{caption}\n\n🧾 Bagian {index}/{total}"
             else:
-                page_caption = f"🧾 Halaman {index}/{total}"
+                page_caption = f"🧾 Bagian {index}/{total}"
         else:
             page_caption = caption
 
@@ -71,11 +72,11 @@ def send_label(png_pages, caption):
         try:
             response = requests.post(url, files=files, data=data, timeout=30)
         except requests.RequestException as e:
-            print(f"  Telegram request failed on page {index}: {e}")
+            print(f"  Telegram request failed on image {index}: {e}")
             return False
 
         if response.status_code != 200 or not response.json().get("ok"):
-            print(f"  Telegram rejected page {index}: HTTP {response.status_code} {response.text}")
+            print(f"  Telegram rejected image {index}: HTTP {response.status_code} {response.text}")
             return False
 
     return True
