@@ -11,8 +11,8 @@ script that:
 
 1. Asks TikTok Shop for recent orders.
 2. Keeps only orders that still need fulfillment attention.
-3. Skips any orders already processed in a previous run.
-4. For each new order:
+3. Skips any packages already processed in a previous run.
+4. For each new package:
    - If still `AWAITING_SHIPMENT`, calls TikTok Shop's ready-to-ship API.
    - Downloads the shipping label PDF.
    - Converts the PDF to one or more PNG images.
@@ -33,12 +33,11 @@ itbisa-tiktokshop-order-bot/
 ├── .github/workflows/
 │   └── run.yml                      # GitHub Actions schedule + bot-state sync
 ├── data/                            # Runtime state used for bootstrap and bot-state sync
-│   ├── processed_orders.json        # Which orders we already sent to Telegram
+│   ├── processed_orders.json        # Which packages we already sent to Telegram
 │   └── tiktokshop_tokens.json       # Current access + refresh tokens
 ├── scripts/
 │   ├── bootstrap_tokens.py          # One-time script to seed tiktokshop_tokens.json
-│   ├── update_inventory.py          # Utility to update TikTok Shop stock from Excel
-│   └── test_*.py                    # Helper / diagnostic scripts for API testing
+│   └── get_chiper_code.py           # Helper to inspect authorized shop cipher data
 ├── src/
 │   ├── __init__.py
 │   ├── main.py                      # Entry point, orchestrates the flow
@@ -91,7 +90,7 @@ TELEGRAM_CHAT_ID=-100123456789
 TikTok Shop tokens are managed in `data/tiktokshop_tokens.json` because they
 must be refreshed automatically.
 
-### 3. Bootstrap the TikTok Shop tokens (one-time)
+### 3. Bootstrap the TikTok Shop tokens one time
 
 1. Log in to TikTok Shop Open Platform.
 2. Authorize the app for your shop.
@@ -107,8 +106,6 @@ python scripts/bootstrap_tokens.py
 
 ## Running locally
 
-### Run with real TikTok Shop
-
 After token bootstrap is complete, run:
 
 ```bash
@@ -118,7 +115,7 @@ python -m src.main
 The bot queries your real TikTok Shop, processes actual packages, downloads
 shipping labels, converts them to images, and sends them to Telegram.
 
-## Production deployment (GitHub Actions)
+## Production deployment with GitHub Actions
 
 Go to **Settings → Secrets and variables → Actions** and add these secrets:
 
@@ -128,7 +125,7 @@ Go to **Settings → Secrets and variables → Actions** and add these secrets:
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 
-### 3. Push the initial state files
+### Push the initial state files
 
 The first workflow run still expects the initial state files to be
 available from `main`. Push them once:
@@ -143,7 +140,7 @@ After the first successful workflow run, ongoing state updates are pushed
 to the `bot-state` branch. The `bot-state` branch should be treated as the
 source of truth for runtime state.
 
-### 4. Verify the workflow runs
+### Verify the workflow runs
 
 Go to the **Actions** tab, click **Run TikTok Shop Order Bot** in the sidebar,
 then click **Run workflow** to trigger a manual test run. Watch the logs
@@ -153,7 +150,7 @@ in your Telegram chat within a minute.
 After the first successful manual run, the schedule takes over and runs the
 bot automatically.
 
-## State management (the `bot-state` branch)
+## State management: the `bot-state` branch
 
 This repo uses two branches:
 
@@ -174,16 +171,16 @@ When you initially set up the bot:
 
 1. Run `python scripts/bootstrap_tokens.py` locally to create
    `data/tiktokshop_tokens.json`.
-2. Push your code to `main` (with `data/processed_orders.json` as `{}` and
-   `data/tiktokshop_tokens.json` from the bootstrap).
+2. Push your code to `main` with `data/processed_orders.json` as `{}` and
+   `data/tiktokshop_tokens.json` from the bootstrap.
 3. Trigger the workflow manually from the Actions tab.
 4. The first run will create or update the `bot-state` branch and push the
    state files there. From then on, runtime updates go to `bot-state`.
 
-### What you should NOT do
+### What you should not do
 
 - Do not delete the `bot-state` branch unless you want to lose the bot's
-  memory of which orders were already processed and which token is current.
+  memory of which packages were already processed and which token is current.
 - Do not enable branch protection on `bot-state`. It is supposed to be
   bot-writable.
 - Do not manually edit files on `bot-state` unless you are recovering
@@ -192,7 +189,20 @@ When you initially set up the bot:
 
 ## How authentication works
 
-TODO
+TikTok Shop uses short-lived access tokens and refresh tokens. This repo keeps
+both tokens in `data/tiktokshop_tokens.json`.
+
+During each run:
+
+1. `src/tiktokshop_auth.py` checks whether the access token is still valid.
+2. If the access token is near expiry, it refreshes the token bundle through
+   TikTok Shop's auth endpoint.
+3. The refreshed access token and refresh token are saved immediately.
+4. The GitHub Actions workflow commits the updated token file back to
+   `bot-state` at the end of the run.
+
+If the refresh token itself expires, the bot raises a clear error and sends a
+Telegram alert. Re-run `scripts/bootstrap_tokens.py` to re-authorize the shop.
 
 ## Daily schedule
 
@@ -205,7 +215,7 @@ Jakarta time (WIB = UTC+7):
 - **16:00 WIB**
 - **18:00 WIB**
 
-In cron syntax (GitHub Actions uses UTC), this is:
+In cron syntax, because GitHub Actions uses UTC, this is:
 
 ```text
 0 3,5,7,9,11 * * *
@@ -231,48 +241,50 @@ When a product has no variants, the main product SKU is shown.
 
 At the end of every run, a short heartbeat message appears:
 
-- `✅ 11:00 - Tidak ada pesanan baru` (quiet hour)
-- `✅ 12:00 - 3 label terkirim` (normal hour)
-- `⚠️ 13:00 - 2 terkirim, 1 gagal (akan dicoba lagi)` (problem hour)
+- `✅ TikTok Shop - 11:00 - Tidak ada pesanan baru`
+- `✅ TikTok Shop - 12:00 - 3 label terkirim`
+- `⚠️ TikTok Shop - 13:00 - 2 terkirim, 1 gagal (akan dicoba lagi)`
 
 If the refresh token expires, a rare manual-intervention alert appears.
 
-## Utility scripts
-
-### `scripts/update_inventory.py`
-
-This script updates TikTok Shop inventory from an Excel file.
-
-Usage:
-
-```bash
-python scripts/update_inventory.py path/to/tiktokshop_inventory.xlsx
-```
-
-Expected Excel columns:
-
-- `SKU`
-- `Stock`
-
-It fetches your product catalog, maps SKUs to TikTok Shop product/SKU IDs, then
-updates stock with a small delay to stay polite to TikTok Shop's rate limits.
-
 ## Troubleshooting
 
-TODO
+### No labels are sent, but the workflow succeeds
+
+Check the heartbeat message. If it says there are no new orders, the bot did
+not find any package in `AWAITING_SHIPMENT` or `AWAITING_COLLECTION` that was
+not already present in `data/processed_orders.json`.
+
+### Waybill is not ready
+
+TikTok Shop may need a short delay after a package is moved to ready-to-ship.
+The bot retries a few times in the same run. If the waybill is still not ready,
+it skips the package and tries again in the next scheduled run.
+
+### Token refresh fails
+
+If TikTok Shop rejects the refresh token, re-run:
+
+```bash
+python scripts/bootstrap_tokens.py
+```
+
+Then commit the refreshed `data/tiktokshop_tokens.json` to `main` for the next
+bootstrap/recovery run, or update the `bot-state` branch carefully if you are
+recovering an existing production bot.
 
 ## Cost
 
 Free forever.
 
 - GitHub Actions: 2000 free minutes per month on private repos. The bot
-  uses roughly 4 runs/day × ~1 minute = about 120 minutes/month.
+  uses roughly 5 runs/day × ~1 minute = about 150 minutes/month.
 - Telegram Bot API: free.
 - TikTok Shop Open API: free.
 - No always-on server costs.
 
 ## Important note
 
-This code keeps the **same bot flow and architecture** as the original Shopee
+This code keeps the same bot flow and architecture as the original Shopee
 version and only swaps the marketplace integration to TikTok Shop. That makes
 it easier to review, easier to diff, and safer to hand over to junior engineers.
