@@ -1,8 +1,13 @@
 """
 get_chiper_code.py
 ------------------
-Fetches the authorized shops list from TikTok Shop and prints the full
-response body so we can see the shop cipher code.
+Diagnostic helper that fetches the authorized shops list from TikTok Shop and
+prints the full response body so we can inspect the shop cipher code manually.
+
+The production bot does not require this script during normal runs because
+src/tiktokshop_client.py fetches and caches the shop cipher automatically.
+Keep the filename as-is for compatibility with existing local notes, even
+though "cipher" is misspelled as "chiper".
 
 This version matches the confirmed working curl shape:
   GET /authorization/202309/shops
@@ -44,7 +49,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src import config
 
 
-# STEP 0: This endpoint uses the TikTok Shop open-api host.
+# STEP 0: This diagnostic endpoint uses the TikTok Shop open-api host.
 _OPEN_API_BASE_URL = "https://open-api.tiktokglobalshop.com"
 
 

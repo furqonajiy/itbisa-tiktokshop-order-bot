@@ -13,9 +13,10 @@
 # State file management:
 #   This workflow uses TWO branches:
 #     - main: source code.
-#     - bot-state: runtime state files (processed_orders.json, tiktokshop_tokens.json).
+#     - bot-state: runtime state/token files only
+#       (processed_orders.json, tiktokshop_tokens.json).
 #   This separation lets the bot commit state freely without touching main.
-#   See README "State Management" section for setup details.
+#   See README "Runtime state branch" section for setup details.
 
 name: Run TikTok Shop Order Bot
 
