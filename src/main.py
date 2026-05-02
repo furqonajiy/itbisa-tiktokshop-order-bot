@@ -1,19 +1,19 @@
 """
 main.py
 -------
-Entry point. Run this file to do one full processing cycle.
+Entry point. Run this module to do one full TikTok Shop processing cycle.
 
 The flow:
   1. Load the set of package_ids we already processed in previous runs.
-  2. Fetch all orders in AWAITING_SHIPMENT or AWAITING_COLLECTION.
+  2. Fetch TikTok Shop orders in AWAITING_SHIPMENT or AWAITING_COLLECTION.
   3. Extract package_ids from those orders (pairing each with its source
      order so we can build the Telegram caption later).
   4. Drop packages we've already processed.
   5. Safety-cap check so we never flood Telegram if something is wrong.
   6. Batch-ship every package whose source order is still AWAITING_SHIPMENT.
-  7. For each new package: download waybill PDF -> convert to Telegram-ready
-     PNG image(s), merged two pages per image -> send to Telegram -> mark
-     processed only AFTER Telegram confirms delivery.
+  7. For each new package: request shipping document -> download waybill PDF ->
+     convert to Telegram-ready PNG image(s), merged two pages per image ->
+     send to Telegram -> mark processed only AFTER Telegram confirms delivery.
   8. Save state.
   9. Send a heartbeat summary so the employee knows the bot ran.
 
@@ -95,7 +95,7 @@ def _do_run():
 
     # Batch-ship packages whose source order is still AWAITING_SHIPMENT.
     # Packages from AWAITING_COLLECTION orders are already shipped and only
-    # need waybill generation.
+    # need waybill generation/download.
     packages_to_ship = [
         job["package_id"] for job in new_jobs
         if job["order"]["status"] == "AWAITING_SHIPMENT"

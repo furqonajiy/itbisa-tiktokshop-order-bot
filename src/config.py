@@ -31,11 +31,12 @@ TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
 # TikTok Shop hosts.
 #   AUTH_BASE_URL     -> token bootstrap + refresh
-#   OPEN_API_BASE_URL -> everything else (shops, orders, fulfillment)
+#   OPEN_API_BASE_URL -> shops, orders, fulfillment, and shipping documents
 TIKTOKSHOP_AUTH_BASE_URL = "https://auth.tiktok-shops.com"
 TIKTOKSHOP_OPEN_API_BASE_URL = "https://open-api.tiktokglobalshop.com"
 
-# Document type passed to Get Package Shipping Document.
+# Document type requested from Get Package Shipping Document.
+# The returned doc_url is pre-signed and downloaded without TikTok Shop auth.
 TIKTOKSHOP_DOCUMENT_TYPE = "SHIPPING_LABEL_AND_PACKING_SLIP"
 
 
