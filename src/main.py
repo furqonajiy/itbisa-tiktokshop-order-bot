@@ -24,6 +24,7 @@ Telegram label deliveries.
 
 import sys
 import time
+import traceback
 from datetime import datetime, timedelta, timezone
 
 from src import (
@@ -55,6 +56,7 @@ def run():
         alert = f"❌ {_now_jakarta_hhmm()} - Error bot TikTok Shop: {e}"
         telegram_sender.send_summary(alert)
         print(f"\n{alert}")
+        traceback.print_exc()
         sys.exit(1)
 
 
@@ -79,6 +81,9 @@ def _do_run():
 
     # Heartbeat if nothing to do.
     if not new_jobs:
+        # Persist pruning from state_manager.load() even on heartbeat-only runs.
+        state_manager.save(processed)
+
         summary = telegram_sender.build_summary(_now_jakarta_hhmm(), 0, 0)
         telegram_sender.send_summary(summary)
         print(f"Sent heartbeat: {summary}")

@@ -20,8 +20,8 @@ Every scheduled or manually triggered run does one processing cycle:
 5. The bot fetches the authorized shop cipher from
    `/authorization/202309/shops` and caches it for the current run.
 6. The bot searches TikTok Shop orders in these statuses:
-   - `AWAITING_SHIPMENT`
-   - `AWAITING_COLLECTION`
+    - `AWAITING_SHIPMENT`
+    - `AWAITING_COLLECTION`
 7. It extracts unique `package_id` values from the returned orders.
 8. It skips packages already present in `processed_orders.json`.
 9. If the number of new packages exceeds `MAX_ORDERS_PER_RUN`, it stops before
@@ -153,8 +153,8 @@ This repo uses two branches:
 
 - **main** holds source code, workflow, scripts, and documentation.
 - **bot-state** holds runtime state/token files only:
-  - `data/processed_orders.json`
-  - `data/tiktokshop_tokens.json`
+    - `data/processed_orders.json`
+    - `data/tiktokshop_tokens.json`
 
 The workflow checks out `main`, overlays the latest `data/` files from
 `bot-state` if that branch exists, runs the bot, then commits updated state and
