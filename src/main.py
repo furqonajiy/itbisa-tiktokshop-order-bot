@@ -24,6 +24,7 @@ Telegram label deliveries.
 
 import sys
 import time
+import traceback
 from datetime import datetime, timedelta, timezone
 
 from src import (
@@ -55,6 +56,7 @@ def run():
         alert = f"❌ {_now_jakarta_hhmm()} - Error bot TikTok Shop: {e}"
         telegram_sender.send_summary(alert)
         print(f"\n{alert}")
+        traceback.print_exc()
         sys.exit(1)
 
 
