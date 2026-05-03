@@ -21,7 +21,6 @@ from pdf2image import convert_from_bytes
 
 from src import config
 
-
 _MERGED_PAGE_GAP_PX = 12
 
 
