@@ -1,5 +1,5 @@
 """
-get_chiper_code.py
+get_tiktokshop_chiper_code.py
 ------------------
 Diagnostic helper that fetches the authorized shops list from TikTok Shop and
 prints the full response body so we can inspect the shop cipher code manually.
@@ -29,7 +29,7 @@ How to use it:
   2. Make sure data/tiktokshop_tokens.json already exists and contains a
      valid access_token.
   3. Run:
-       python scripts/get_chiper_code.py
+       python scripts/get_tiktokshop_chiper_code.py
 """
 
 import hashlib
