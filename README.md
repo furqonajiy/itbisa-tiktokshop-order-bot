@@ -58,7 +58,7 @@ itbisa-tiktokshop-order-bot/
 │   └── tiktokshop_tokens.json       # access_token + refresh_token bundle
 ├── scripts/
 │   ├── bootstrap_tokens.py          # One-time / recovery token bootstrap
-│   └── get_chiper_code.py           # Diagnostic helper; name kept as-is
+│   └── get_tiktokshop_chiper_code.py           # Diagnostic helper; name kept as-is
 ├── src/
 │   ├── __init__.py
 │   ├── main.py                      # Entry point, orchestrates one run
