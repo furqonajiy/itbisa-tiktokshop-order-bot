@@ -79,6 +79,9 @@ def _do_run():
 
     # Heartbeat if nothing to do.
     if not new_jobs:
+        # Persist pruning from state_manager.load() even on heartbeat-only runs.
+        state_manager.save(processed)
+
         summary = telegram_sender.build_summary(_now_jakarta_hhmm(), 0, 0)
         telegram_sender.send_summary(summary)
         print(f"Sent heartbeat: {summary}")
