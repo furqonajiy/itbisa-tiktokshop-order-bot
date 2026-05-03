@@ -39,18 +39,18 @@ _cached_shop_cipher = None
 # ============================================================
 
 def get_pending_orders():
-    """Returns all orders in AWAITING_SHIPMENT or AWAITING_COLLECTION.
+    """Returns recent orders in AWAITING_SHIPMENT or AWAITING_COLLECTION.
 
-    TikTok Shop's order search endpoint only accepts one status per call,
-    so we run two searches and merge by order id. AWAITING_SHIPMENT is
-    checked first so an order that somehow appears in both stays tagged
-    as still needing shipment.
+    The 3-day lookback mirrors STATE_RETENTION_DAYS because old airway bills
+    are no longer useful after that window.
     """
     merged = {}
+    lookback_seconds = config.STATE_RETENTION_DAYS * 24 * 60 * 60
+    create_time_ge = int(time.time()) - lookback_seconds
 
     for status in _PENDING_STATUSES:
-        print(f"  Searching orders with status {status}...")
-        status_orders = _search_orders_by_status(status)
+        print(f"  Searching recent orders with status {status}...")
+        status_orders = _search_orders_by_status(status, create_time_ge)
         print(f"  Status {status}: {len(status_orders)} order(s)")
 
         for order in status_orders:
@@ -61,13 +61,16 @@ def get_pending_orders():
     return list(merged.values())
 
 
-def _search_orders_by_status(status):
-    """Paginates through all orders for one status."""
+def _search_orders_by_status(status, create_time_ge):
+    """Paginates through recent orders for one status."""
     all_orders = []
     page_token = None
 
     while True:
-        body = {"order_status": status}
+        body = {
+            "order_status": status,
+            "create_time_ge": create_time_ge,
+        }
         extra_query = {"page_size": "50"}
         if page_token:
             extra_query["page_token"] = page_token
