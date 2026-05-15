@@ -135,11 +135,11 @@ def build_caption(order):
     for sku, info in groups.items():
         if multi_courier and info["couriers"]:
             courier_text = " / ".join(info["couriers"])
-            item_lines.append(f"  • {info['qty']} x {sku} ({courier_text})")
+            item_lines.append(f"• {info['qty']} x {sku} ({courier_text})")
         else:
-            item_lines.append(f"  • {info['qty']} x {sku}")
+            item_lines.append(f"• {info['qty']} x {sku}")
 
-    items_text = "\n".join(item_lines) if item_lines else "  (tidak ada barang)"
+    items_text = "\n".join(item_lines) if item_lines else "(tidak ada barang)"
 
     return (
         f"📦 {order_id}\n"
