@@ -139,7 +139,7 @@ def build_caption(order):
         else:
             item_lines.append(f"• {info['qty']} x {sku}")
 
-        items_text = "\n".join(item_lines) if item_lines else "(tidak ada barang)"
+    items_text = "\n".join(item_lines) if item_lines else "(tidak ada barang)"
 
     return (
         f"📦 {order_id}\n"
