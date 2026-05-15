@@ -13,9 +13,12 @@ The flow:
   6. Batch-ship every package whose source order is still AWAITING_SHIPMENT.
   7. For each new package: request shipping document -> download waybill PDF ->
      convert to Telegram-ready PNG image(s), merged two pages per image ->
-     send to Telegram -> mark processed only AFTER Telegram confirms delivery.
+     send to Telegram -> mark processed only AFTER Telegram confirms delivery ->
+     record source order's seller_skus into the balance dispatcher.
   8. Save state.
-  9. Send a heartbeat summary so the employee knows the bot ran.
+  9. Dispatch /stock_balance for every base SKU touched this run. Best-effort,
+     never fails the order run.
+ 10. Send a heartbeat summary so the employee knows the bot ran.
 
 We track package_id (not order_id) because each package gets its own waybill
 and its own Telegram send. An order with multiple packages produces multiple
@@ -28,6 +31,7 @@ import traceback
 from datetime import datetime, timedelta, timezone
 
 from src import (
+    balance_dispatcher,
     config,
     label_processor,
     state_manager,
@@ -41,6 +45,25 @@ JAKARTA_TZ = timezone(timedelta(hours=7))
 def _now_jakarta_hhmm():
     """Returns the current Jakarta time as a HH:MM string."""
     return datetime.now(JAKARTA_TZ).strftime("%H:%M")
+
+
+def _format_balance_line(balance_result):
+    """Formats the balance-dispatch line appended to the heartbeat.
+
+    Returns an empty string when nothing was dispatched, so heartbeats on
+    zero-package runs are unchanged.
+    """
+    requested = balance_result["requested"]
+    if requested == 0:
+        return ""
+
+    dispatched = balance_result["dispatched"]
+    failed = balance_result["failed"]
+
+    line = f"\n⚖️ Stock Balance: {dispatched}/{requested} SKU dipicu"
+    if failed:
+        line += f"\n⚠️ Gagal dipicu: {', '.join(failed)}"
+    return line
 
 
 def run():
@@ -66,6 +89,10 @@ def _do_run():
     processed = state_manager.load()
     print(f"Loaded state: {len(processed)} previously processed packages")
 
+    # Per-run collector for shipped base SKUs. Populated only when Telegram
+    # confirms label delivery. Dispatched after the package loop finishes.
+    balance = balance_dispatcher.BalanceDispatcher()
+
     print("Fetching pending orders from TikTok Shop...")
     orders = tiktokshop_client.get_pending_orders()
     print(f"TikTok Shop returned {len(orders)} pending orders")
@@ -79,7 +106,7 @@ def _do_run():
     )
     print(f"Of those, {len(new_jobs)} are new and need processing")
 
-    # Heartbeat if nothing to do.
+    # Heartbeat if nothing to do. No balance dispatch because nothing shipped.
     if not new_jobs:
         # Persist pruning from state_manager.load() even on heartbeat-only runs.
         state_manager.save(processed)
@@ -150,6 +177,17 @@ def _do_run():
             state_manager.save(processed)
             success_count += 1
             print("  ✓ Sent to Telegram, saved state, and marked as processed")
+
+            # Record each line item's seller_sku for end-of-run balance dispatch.
+            # We use order["line_items"] rather than per-package line items
+            # because TikTok Shop's package payload only carries package id;
+            # line-item-to-package mapping is order-level. Recording the whole
+            # order's SKUs may over-record when an order spans multiple packages
+            # and one fails, but the BalanceDispatcher dedupes by base SKU and
+            # /stock_balance is idempotent — re-running it for a SKU that
+            # didn't actually change is harmless.
+            for item in order.get("line_items", []) or []:
+                balance.record(item.get("seller_sku", ""))
         else:
             print("  ✗ Telegram delivery failed. Will retry next run.")
             skipped_count += 1
@@ -159,12 +197,24 @@ def _do_run():
     state_manager.save(processed)
     print("\nState saved.")
 
+    # Dispatch /stock_balance for every base SKU touched this run.
+    # Best-effort: dispatcher swallows individual failures and reports them
+    # so the order run never fails because of a balance hiccup. Labels are
+    # the critical path.
+    balance_result = balance.dispatch_all()
+
     summary = telegram_sender.build_summary(
         _now_jakarta_hhmm(), success_count, skipped_count
     )
+    summary += _format_balance_line(balance_result)
     telegram_sender.send_summary(summary)
+
     print("=" * 60)
     print(f"Run complete: {success_count} sent, {skipped_count} skipped")
+    print(
+        f"Balance: {balance_result['dispatched']}/{balance_result['requested']} "
+        f"SKU dispatched"
+    )
     print("=" * 60)
 
 
