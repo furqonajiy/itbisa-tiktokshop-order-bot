@@ -31,7 +31,7 @@ Document type: `SHIPPING_LABEL_AND_PACKING_SLIP`.
 - Heartbeat summary includes the balance result.
 
 ## Label flow
-GET `/fulfillment/202309/packages/{package_id}/shipping_documents`, `document_type = SHIPPING_LABEL_AND_PACKING_SLIP`. Response has `doc_url`. **Download `doc_url` without TikTok Shop auth** (pre-signed). Retry within the run if `doc_url`/PDF not ready; if still not ready, skip and retry next scheduled run.
+GET `/fulfillment/202309/packages/{package_id}/shipping_documents`, `document_type = SHIPPING_LABEL_AND_PACKING_SLIP`. Response has `doc_url`. **Download `doc_url` without TikTok Shop auth** (pre-signed). Retry within the run if `doc_url`/PDF not ready; if still not ready, skip and retry next run.
 
 ## Auth
 - Auth calls are plain unsigned GET. Refresh endpoint: `https://auth.tiktok-shops.com/api/v2/token/refresh`.
@@ -46,15 +46,15 @@ GET `/fulfillment/202309/packages/{package_id}/shipping_documents`, `document_ty
 
 ## API quirks (do not regress)
 - The `orders` key is **omitted entirely** (not an empty list) when there are no results — use `.get()` with empty defaults.
-- Search endpoint family: `202502`. Most others: `202309`.
+- All Open API endpoints used here are version `202309` (orders search `/order/202309/orders/search`, ship, shipping documents, shops). This order bot does not use the `202502` search family.
 
 ## Telegram output
 - Bahasa Indonesia.
 - Caption item lines: `• {qty} x {sku}` — single space, no leading indent. For orders with multiple distinct couriers, inline per SKU: `• {qty} x {sku} ({courier})`.
-- Heartbeat uses `TIKTOKSHOP_LABEL` = "♪TikTok Shop":
-    - `✅ ♪TikTok Shop - 11:00 - Tidak ada pesanan baru`
-    - `✅ ♪TikTok Shop - 12:00 - 3 label terkirim`
-    - `⚠️ ♪TikTok Shop - 13:00 - 2 terkirim, 1 gagal (akan dicoba lagi)`
+- Heartbeat uses the plain label `TikTok Shop` (hardcoded in `telegram_sender.build_summary`; no `TIKTOKSHOP_LABEL` constant in this repo):
+    - `✅ TikTok Shop - 11:00 - Tidak ada pesanan baru`
+    - `✅ TikTok Shop - 12:00 - 3 label terkirim`
+    - `⚠️ TikTok Shop - 13:00 - 2 terkirim, 1 gagal (akan dicoba lagi)`
 - Append `⚖️ Stock Balance: X/Y SKU dipicu` when balance fired this run.
 
 ## balance_dispatcher.py — duplicated across both order bots intentionally
@@ -67,7 +67,7 @@ GET `/fulfillment/202309/packages/{package_id}/shipping_documents`, `document_ty
 - TikTok Shop records via `order["line_items"][].seller_sku` (already the variant SKU). Over-recording is harmless — the dispatcher dedupes and `/stock_balance` is idempotent. `record()` is called only in the success branch; `dispatch_all()` once after the loop + final save.
 
 ## Workflow (run.yml) — required config
-- Triggers: `schedule` cron `0 3,5,7,9,11 * * *` (10/12/14/16/18 WIB; GitHub cron is UTC) **and** `workflow_dispatch`.
+- Trigger: `workflow_dispatch` only (manual from the Actions tab, or dispatched by the Telegram Worker). No `schedule`/cron.
 - Checkout `main` as source; overlay `data/` from `bot-state`; run the bot once; commit updated state/token files to `bot-state` with `if: always()`.
 - Concurrency: group `bot-state-${{ github.repository }}`, `cancel-in-progress: false`.
 - Install `poppler-utils` (pdf2image). Python 3.11. `actions/checkout@v5+`, `actions/setup-python@v6+`. `permissions.contents: write`.
@@ -80,11 +80,11 @@ TikTok Shop `app_key`/`secret`/`shop_id`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_I
 - GitHub Actions only. No VM, server, database, queue, or long-running process.
 - `main` = source code. `bot-state` = runtime state/token files only. Never protect `bot-state`. Never commit live token files to `main`.
 - Never hardcode secrets.
-- Self-contained repo, no shared library — `balance_dispatcher.py` and the platform-label constants are duplicated across repos on purpose; do not factor them out.
+- Self-contained repo, no shared library — `balance_dispatcher.py` is duplicated across the order bots on purpose; do not factor it out.
 - Minimal, targeted changes only. No broad refactors; preserve existing behavior unless explicitly in scope.
 - Telegram user-facing strings: Bahasa Indonesia. Use "stock", not "inventory" (except real endpoint names such as `/inventory/update`).
-- Platform labels live in `src/telegram_sender.py`: `SHOPEE_LABEL = "🟧Shopee"`, `TIKTOKSHOP_LABEL = "♪TikTok Shop"` (U+266A text glyph). Single-space formatting; no multi-space alignment; omit bullets where the glyph already separates.
+- Platform label: heartbeats use the plain string `TikTok Shop` (no glyph, no label constant in this repo). Single-space formatting; no multi-space alignment.
 - Runtime dispatch/checkout ref is `main`. `feature/improve` must be merged to `main` before production uses it.
 
 ## Flag before changing
-State/token format (incl. `refresh_token_expires_at`), Open API signing / canonical string / `shop_cipher`, `bot-state`, cron/schedule, the `package_id` track unit, `seller_sku` recording, `balance_dispatcher` batching / best-effort model, label flow (`doc_url` no-auth download), `202502` vs `202309` endpoint usage, workflow concurrency (`cancel-in-progress: false`), Telegram chat authorization, token rotation.
+State/token format (incl. `refresh_token_expires_at`), Open API signing / canonical string / `shop_cipher`, `bot-state`, `workflow_dispatch`-only trigger, the `package_id` track unit, `seller_sku` recording, `balance_dispatcher` batching / best-effort model, label flow (`doc_url` no-auth download), `202309` endpoint usage, workflow concurrency (`cancel-in-progress: false`), Telegram chat authorization, token rotation.

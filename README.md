@@ -10,7 +10,7 @@ cloud VM, and no database.
 
 ## Real production flow
 
-Every scheduled or manually triggered run does one processing cycle:
+Each run (dispatched manually or by the Telegram Worker — `workflow_dispatch` only, no cron) does one processing cycle:
 
 1. GitHub Actions checks out `main` for source code.
 2. The workflow overlays `data/processed_orders.json` and
@@ -40,8 +40,11 @@ Every scheduled or manually triggered run does one processing cycle:
 15. The label image(s) are sent to Telegram with a Bahasa Indonesia caption.
 16. A `package_id` is marked processed only after Telegram confirms delivery.
     State is saved immediately after each successful package.
-17. At the end, the bot sends a heartbeat summary to Telegram.
-18. The workflow commits updated runtime state and rotated tokens back to
+17. After the loop, it dispatches the stock bot's `/stock_balance` once with all
+    touched base SKUs (single `workflow_dispatch`; best-effort, never fatal).
+18. At the end, the bot sends a heartbeat summary to Telegram. The heartbeat
+    appends `⚖️ Stock Balance: X/Y SKU dipicu` when a balance was dispatched.
+19. The workflow commits updated runtime state and rotated tokens back to
     `bot-state`.
 
 The tracking unit is `package_id`, not `order_id`, because one TikTok Shop
@@ -52,13 +55,14 @@ order can contain multiple packages and each package has its own label.
 ```text
 itbisa-tiktokshop-order-bot/
 ├── .github/workflows/
-│   └── run.yml                      # GitHub Actions schedule + bot-state sync
+│   └── run.yml                      # GitHub Actions workflow_dispatch + bot-state sync
 ├── data/                            # Runtime state bootstrap files
 │   ├── processed_orders.json        # package_id values already sent to Telegram
 │   └── tiktokshop_tokens.json       # access_token + refresh_token bundle
 ├── scripts/
 │   ├── bootstrap_tokens.py          # One-time / recovery token bootstrap
-│   └── get_tiktokshop_chiper_code.py           # Diagnostic helper; name kept as-is
+│   ├── get_tiktokshop_chiper_code.py           # Diagnostic helper; name kept as-is
+│   └── test_telegram.py             # Telegram send diagnostic
 ├── src/
 │   ├── __init__.py
 │   ├── main.py                      # Entry point, orchestrates one run
@@ -67,7 +71,8 @@ itbisa-tiktokshop-order-bot/
 │   ├── tiktokshop_client.py         # TikTok Shop Open API calls + signing
 │   ├── label_processor.py           # PDF → PNG conversion + 2-page merge
 │   ├── telegram_sender.py           # Telegram labels + Bahasa status messages
-│   └── state_manager.py             # Loads/saves processed package state
+│   ├── state_manager.py             # Loads/saves processed package state
+│   └── balance_dispatcher.py        # Dispatches /stock_balance once after the run
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -146,6 +151,7 @@ Go to **Settings → Secrets and variables → Actions** and add these secrets:
 - `TIKTOKSHOP_SHOP_ID`
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
+- `STOCK_DISPATCH_TOKEN` (PAT used to dispatch the stock bot's `/stock_balance`)
 
 ### Runtime state branch
 
@@ -186,8 +192,8 @@ then click **Run workflow** to trigger a manual test run. Watch the logs to
 confirm everything works. You should see a heartbeat message arrive in your
 Telegram chat within a minute.
 
-After the first successful manual run, the schedule takes over and runs the
-bot automatically.
+The bot runs only when dispatched (manually or by the Telegram Worker); there is
+no automatic schedule.
 
 ## Authentication and signing
 
@@ -226,25 +232,11 @@ Open API calls use TikTok Shop signing:
   `path + params + raw body`, wraps it with `app_secret` at both ends, then
   signs with HMAC-SHA256.
 
-## Daily schedule
+## Triggering
 
-The GitHub Actions workflow currently runs **5 times per day** based on
-Jakarta time (WIB = UTC+7):
-
-- **10:00 WIB**
-- **12:00 WIB**
-- **14:00 WIB**
-- **16:00 WIB**
-- **18:00 WIB**
-
-In cron syntax, because GitHub Actions uses UTC, this is:
-
-```text
-0 3,5,7,9,11 * * *
-```
-
-The workflow also supports `workflow_dispatch`, so it can be triggered manually
-from GitHub Actions or by the upstream Telegram router.
+The workflow is `workflow_dispatch`-only — there is **no cron schedule**. It runs
+when triggered manually from the Actions tab or dispatched by the upstream
+Telegram router. Treat `.github/workflows/run.yml` as the source of truth.
 
 ## What the warehouse sees in Telegram
 
@@ -288,13 +280,13 @@ not find any unprocessed package in `AWAITING_SHIPMENT` or
 
 TikTok Shop may need a short delay after a package is moved to ready-to-ship.
 The bot retries a few times in the same run. If the waybill is still not ready,
-it skips the package and tries again in the next scheduled run.
+it skips the package and tries again on the next run.
 
 ### Telegram delivery fails
 
 The package is not marked processed unless Telegram accepts every image for
 that package. Failed packages remain unprocessed and will be retried on the
-next scheduled run.
+next run.
 
 ### Token refresh fails
 
@@ -312,8 +304,8 @@ files on `main` and then create/update `bot-state`.
 
 Free forever for the current usage pattern.
 
-- GitHub Actions: 2000 free minutes per month on private repos. The bot uses
-  roughly 5 runs/day × ~1 minute = about 150 minutes/month.
+- GitHub Actions: 2000 free minutes per month on private repos. Each run is
+  ~1 minute; total depends on how often the bot is dispatched.
 - Telegram Bot API: free.
 - TikTok Shop Open API: free.
 - No always-on server costs.
