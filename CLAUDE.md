@@ -94,6 +94,7 @@ TikTok Shop `app_key`/`secret`/`shop_id`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_I
 - Keep changes minimal and targeted; update `CLAUDE.md` / `README.md` in the same PR whenever behavior or process changes.
 - `PROJECT_INSTRUCTIONS.md` is the synced source for the Claude & ChatGPT project instructions (≤ 8000 chars, ChatGPT limit). Update it **only when explicitly asked**, not on every change.
 - Sync marker: a file named `YYYY-MM-DD_HHMM.txt` (WIB) sits at the repo root. **On every update to this repo, rename it to the current WIB timestamp** — it signals whether the repo / Claude / ChatGPT instructions are in sync.
+- Doc/marker updates (this file, `PROJECT_INSTRUCTIONS.md`, the sync marker) ride in the **same feature branch and PR as the related code change** — never a separate doc-only branch (avoids noise).
 
 ## Flag before changing
 State/token format (incl. `refresh_token_expires_at`), Open API signing / canonical string / `shop_cipher`, `bot-state`, `workflow_dispatch`-only trigger, the `package_id` track unit, `seller_sku` recording, `balance_dispatcher` batching / best-effort model, label flow (`doc_url` no-auth download), `202309` endpoint usage, workflow concurrency (`cancel-in-progress: false`), Telegram chat authorization, token rotation.
