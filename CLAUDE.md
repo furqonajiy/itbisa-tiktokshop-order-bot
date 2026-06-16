@@ -9,7 +9,8 @@ Always write "TikTok Shop" / `tiktokshop` / `TIKTOKSHOP`. **Never shorten to "Ti
 ## Stack & files
 - Python 3.11.
 - `src/main.py` (orchestration), `src/tiktokshop_client.py`, `src/tiktokshop_auth.py`, `src/label_processor.py`, `src/telegram_sender.py`, `src/state_manager.py`, `src/balance_dispatcher.py`.
-- Workflow: `.github/workflows/run.yml`.
+- Workflow: `.github/workflows/run.yml` (execution, `workflow_dispatch`); `ci.yml` (quality gate — runs `pytest` on PRs/pushes; no secrets, never touches `bot-state`).
+- Tests: `tests/` (pytest). Pure logic only — `balance_dispatcher` (`to_base_sku`, dedup, best-effort no-token dispatch) and `telegram_sender` caption helpers (`_mono`, `build_caption` incl. multi-courier inline). Dev deps in `requirements-dev.txt`; run `pytest -q`. Network/API and the label flow are not unit-tested.
 - **Track unit: `package_id`** (NOT `order_id`). One order can have multiple packages; each package has its own waybill and its own Telegram send.
 
 ## Constants & URLs
