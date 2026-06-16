@@ -52,7 +52,7 @@ GET `/fulfillment/202309/packages/{package_id}/shipping_documents`, `document_ty
 
 ## Telegram output
 - Bahasa Indonesia.
-- Caption item lines: `• {qty} x {sku}` — single space, no leading indent. For orders with multiple distinct couriers, inline per SKU: `• {qty} x {sku} ({courier})`.
+- Caption item lines: `• {qty} x {sku}` — single space, no leading indent. For orders with multiple distinct couriers, inline per SKU: `• {qty} x {sku} ({courier})`. The caption is sent with `parse_mode=Markdown`; order number, courier, and SKU are wrapped in backtick code spans (`_mono`) so they are tap-to-copy. `_mono` strips backticks from the value so a code span can never break and fail the label send.
 - Heartbeat uses the plain label `TikTok Shop` (hardcoded in `telegram_sender.build_summary`; no `TIKTOKSHOP_LABEL` constant in this repo):
     - `✅ TikTok Shop - 11:00 - Tidak ada pesanan baru`
     - `✅ TikTok Shop - 12:00 - 3 label terkirim`

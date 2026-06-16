@@ -67,7 +67,11 @@ def send_label(png_pages, caption):
             page_caption = caption
 
         files = {"photo": (f"label_{index}.png", png_bytes, "image/png")}
-        data = {"chat_id": config.TELEGRAM_CHAT_ID, "caption": page_caption}
+        data = {
+            "chat_id": config.TELEGRAM_CHAT_ID,
+            "caption": page_caption,
+            "parse_mode": "Markdown",
+        }
 
         try:
             response = requests.post(url, files=files, data=data, timeout=30)
@@ -104,6 +108,15 @@ def send_summary(text):
 # Caption building
 # ============================================================
 
+def _mono(value):
+    """Wrap a value in a Markdown code span so it renders monospace and is
+    tap-to-copy in Telegram. Strips any backtick from the value so the code
+    span can never break and trigger a Telegram parse error (which would fail
+    the label send). Requires the caption to be sent with parse_mode=Markdown.
+    """
+    return "`" + str(value).replace("`", "") + "`"
+
+
 def build_caption(order):
     """Builds the per-label caption in Bahasa Indonesia."""
     order_id = order["id"]
@@ -135,15 +148,17 @@ def build_caption(order):
     for sku, info in groups.items():
         if multi_courier and info["couriers"]:
             courier_text = " / ".join(info["couriers"])
-            item_lines.append(f"• {info['qty']} x {sku} ({courier_text})")
+            item_lines.append(f"• {info['qty']} x {_mono(sku)} ({_mono(courier_text)})")
         else:
-            item_lines.append(f"• {info['qty']} x {sku}")
+            item_lines.append(f"• {info['qty']} x {_mono(sku)}")
 
     items_text = "\n".join(item_lines) if item_lines else "(tidak ada barang)"
 
+    # Order number, courier, and SKU are wrapped in code spans so they are
+    # tap-to-copy in Telegram (caption is sent with parse_mode=Markdown).
     return (
-        f"📦 {order_id}\n"
-        f"🚚 {courier_line}\n"
+        f"📦 {_mono(order_id)}\n"
+        f"🚚 {_mono(courier_line)}\n"
         f"\n"
         f"Barang:\n"
         f"{items_text}"

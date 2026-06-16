@@ -39,7 +39,7 @@ Auth calls are plain unsigned GET. Refresh endpoint: `https://auth.tiktok-shops.
 - All Open API endpoints used here are version `202309` (orders search `/order/202309/orders/search`, ship, shipping documents, shops). This order bot does not use the `202502` search family.
 
 ## Telegram output
-- Bahasa Indonesia. Caption item lines: `• {qty} x {sku}` — single space, no leading indent. For orders with multiple distinct couriers, inline per SKU: `• {qty} x {sku} ({courier})`.
+- Bahasa Indonesia. Caption item lines: `• {qty} x {sku}` — single space, no leading indent. For orders with multiple distinct couriers, inline per SKU: `• {qty} x {sku} ({courier})`. Caption is sent with `parse_mode=Markdown`; order number, courier, and SKU are wrapped in backtick code spans (`_mono`, which strips backticks) so they are tap-to-copy.
 - Heartbeat uses the plain label `TikTok Shop` (hardcoded in `telegram_sender.build_summary`; no `TIKTOKSHOP_LABEL` constant): e.g. `✅ TikTok Shop - 12:00 - 3 label terkirim`, `⚠️ TikTok Shop - 13:00 - 2 terkirim, 1 gagal (akan dicoba lagi)`. Append `⚖️ Stock Balance: X/Y SKU dipicu` when balance fired. Use "stock" not "inventory" (except real endpoint names like `/inventory/update`).
 
 ## balance_dispatcher.py — duplicated across both order bots intentionally
