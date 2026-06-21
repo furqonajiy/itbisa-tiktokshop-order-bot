@@ -25,6 +25,7 @@ and its own Telegram send. An order with multiple packages produces multiple
 Telegram label deliveries.
 """
 
+import os
 import sys
 import time
 import traceback
@@ -116,6 +117,39 @@ def _run_throttled_balance(balance):
     return result
 
 
+def _emit_has_work(value: bool) -> None:
+    """Write the precheck result to GITHUB_OUTPUT (and the log).
+
+    The workflow installs poppler and runs the full bot unless this is
+    explicitly `false`, so a missing/garbled output fails safe to "run".
+    """
+    text = "true" if value else "false"
+    print(f"[precheck] has_work={text}")
+    out_path = os.environ.get("GITHUB_OUTPUT")
+    if out_path:
+        try:
+            with open(out_path, "a", encoding="utf-8") as f:
+                f.write(f"has_work={text}\n")
+        except OSError as e:
+            print(f"[precheck] could not write GITHUB_OUTPUT: {e}")
+
+
+def run_precheck():
+    """Lightweight 'is there work?' probe that needs no poppler.
+
+    Reuses the exact package-detection of `_do_run`. On a clean zero-new-packages
+    result it sends the heartbeat + saves state (identical to an empty full run)
+    and emits `has_work=false` so the workflow can skip poppler and the full run.
+    On ANY work, error, or uncertainty it emits `has_work=true` so the full run
+    proceeds as today. Always exits 0 so it never fails the job.
+    """
+    try:
+        _do_run(precheck=True)
+    except Exception as e:  # fail safe: defer to the full run
+        print(f"[precheck] error; deferring to full run: {e}")
+        _emit_has_work(True)
+
+
 def run():
     """Runs one full cycle. Forwards any error to Telegram before exiting."""
 
@@ -133,8 +167,14 @@ def run():
         sys.exit(1)
 
 
-def _do_run():
-    """The actual run. Kept separate so run() can wrap it cleanly."""
+def _do_run(precheck=False):
+    """The actual run. Kept separate so run() can wrap it cleanly.
+
+    When `precheck=True`, stop after deciding whether there is work: on no new
+    packages, send the heartbeat + save state (as on an empty run) and emit
+    `has_work=false`; otherwise emit `has_work=true` and return without doing
+    the (poppler-dependent) label work — the full run handles that.
+    """
 
     processed = state_manager.load()
     print(f"Loaded state: {len(processed)} previously processed packages")
@@ -164,6 +204,14 @@ def _do_run():
         summary = telegram_sender.build_summary(_now_jakarta_hhmm(), 0, 0)
         telegram_sender.send_summary(summary)
         print(f"Sent heartbeat: {summary}")
+        if precheck:
+            _emit_has_work(False)
+        return
+
+    # In precheck mode there IS work: tell the workflow to install poppler and
+    # run the full processor (which re-fetches and does the actual work).
+    if precheck:
+        _emit_has_work(True)
         return
 
     # Safety cap: if something looks wildly off, stop before flooding Telegram.
@@ -289,4 +337,7 @@ def _extract_package_jobs(orders):
 
 
 if __name__ == "__main__":
-    run()
+    if "--precheck" in sys.argv:
+        run_precheck()
+    else:
+        run()

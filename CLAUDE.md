@@ -74,7 +74,8 @@ GET `/fulfillment/202309/packages/{package_id}/shipping_documents`, `document_ty
 - Trigger: `workflow_dispatch` only (manual from the Actions tab, or dispatched by the Telegram Worker). No `schedule`/cron.
 - Checkout `main` as source; overlay `data/` from `bot-state`; run the bot once; commit updated state/token files to `bot-state` with `if: always()`.
 - Concurrency: group `bot-state-${{ github.repository }}`, `cancel-in-progress: false`.
-- Install `poppler-utils` (pdf2image). Python 3.11. `actions/checkout@v5+`, `actions/setup-python@v6+`. `permissions.contents: write`.
+- **Idle-run efficiency:** an `id: precheck` step runs `python -m src.main --precheck` (no poppler) to detect new packages. It emits `has_work=false` ONLY on a clean zero-new-packages result (and sends the heartbeat + saves state itself, via `_do_run(precheck=True)`); on work/error/uncertainty it emits `true`. The **Install poppler** and **Run order processor** steps are gated `if: steps.precheck.outputs.has_work != 'false'` — fail-safe (missing/garbled output → runs). `_emit_has_work` / `run_precheck` live in `src/main.py`.
+- Install `poppler-utils` (pdf2image) only when there is work; step is `apt-get install -y poppler-utils || (apt-get update && apt-get install -y poppler-utils)` (skip the slow update on the common path, fall back for safety). Python 3.11, pip-cached. `actions/checkout@v5+`, `actions/setup-python@v6+`. `permissions.contents: write`.
 - Run-step env must include `STOCK_DISPATCH_TOKEN`.
 
 ## Secrets
