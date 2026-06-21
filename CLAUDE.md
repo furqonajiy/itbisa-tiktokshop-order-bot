@@ -9,8 +9,8 @@ Always write "TikTok Shop" / `tiktokshop` / `TIKTOKSHOP`. **Never shorten to "Ti
 ## Stack & files
 - Python 3.11.
 - `src/main.py` (orchestration), `src/tiktokshop_client.py`, `src/tiktokshop_auth.py`, `src/label_processor.py`, `src/telegram_sender.py`, `src/state_manager.py`, `src/balance_dispatcher.py`.
-- Workflow: `.github/workflows/run.yml` (execution, `workflow_dispatch`); `ci.yml` (quality gate — runs `pytest` on PRs/pushes; no secrets, never touches `bot-state`).
-- Tests: `tests/` (pytest). Pure logic only — `balance_dispatcher` (`to_base_sku`, dedup, best-effort no-token dispatch) and `telegram_sender` caption helpers (`_mono`, `build_caption` incl. multi-courier inline). Dev deps in `requirements-dev.txt`; run `pytest -q`. Network/API and the label flow are not unit-tested.
+- Workflow: `.github/workflows/run.yml` (execution, `workflow_dispatch`); `ci.yml` (quality gate — runs `pytest` on PRs that touch code/tests/deps, pip-cached, cancels superseded runs; no secrets, never touches `bot-state`).
+- Tests: `tests/` (pytest). Pure logic only — `balance_dispatcher` (`to_base_sku`, dedup, best-effort no-token dispatch), `balance_throttle` (`merge_pending`, `window_open`), and `telegram_sender` caption helpers (`_mono`, `build_caption` incl. multi-courier inline). Dev deps in `requirements-dev.txt`; run `pytest -q`. Network/API and the label flow are not unit-tested.
 - **Track unit: `package_id`** (NOT `order_id`). One order can have multiple packages; each package has its own waybill and its own Telegram send.
 
 ## Constants & URLs
@@ -19,7 +19,7 @@ Always write "TikTok Shop" / `tiktokshop` / `TIKTOKSHOP`. **Never shorten to "Ti
 Document type: `SHIPPING_LABEL_AND_PACKING_SLIP`.
 
 ## State / tokens (committed to bot-state)
-- `data/processed_orders.json`, `data/tiktokshop_tokens.json`.
+- `data/processed_orders.json`, `data/tiktokshop_tokens.json`, `data/balance_throttle.json`.
 - Token file fields: `access_token`, `refresh_token`, `access_token_expires_at`, `refresh_token_expires_at`. **Respect `refresh_token_expires_at`.**
 - Save rotated tokens immediately after refresh.
 
@@ -61,13 +61,14 @@ GET `/fulfillment/202309/packages/{package_id}/shipping_documents`, `document_ty
 - Append `⚖️ Stock Balance: X/Y SKU dipicu` when balance fired this run.
 
 ## balance_dispatcher.py — duplicated across both order bots intentionally
-- `class BalanceDispatcher` with `record(sku)` and `dispatch_all()`.
+- `class BalanceDispatcher` with `record(sku)`, `collected()`, and `dispatch_all()`.
 - `record()`/`to_base_sku()`: strips leading `^\d+PCS-` and uppercases; ignores empty/None; dedupes via internal set.
 - `dispatch_all()`: fires a SINGLE `workflow_dispatch` on `furqonajiy/itbisa-shop-stock-bot/balance.yml`, `ref=main`, `sku` = all collected base SKUs space-joined, `dry_run=false`. One HTTP call regardless of count.
 - Requires env `STOCK_DISPATCH_TOKEN`. If missing, all collected SKUs reported failed; the run still finishes normally.
 - Returns `{requested, dispatched, failed, skus}`; counts reflect SKUs.
 - Best-effort: failure is logged and reported in the heartbeat, **never raised**.
-- TikTok Shop records via `order["line_items"][].seller_sku` (already the variant SKU). Over-recording is harmless — the dispatcher dedupes and `/stock_balance` is idempotent. `record()` is called only in the success branch; `dispatch_all()` once after the loop + final save.
+- TikTok Shop records via `order["line_items"][].seller_sku` (already the variant SKU). Over-recording is harmless — the dispatcher dedupes and `/stock_balance` is idempotent. `record()` is called only in the success branch; the dispatch happens once after the loop + final save via `_run_throttled_balance` (see below).
+- **Throttle (`balance_throttle.py`, duplicated):** dispatch fires at most once per `MIN_INTERVAL_HOURS` (6) to conserve GitHub Actions minutes. Base SKUs touched while throttled accumulate in `pending_skus` (`data/balance_throttle.json` on `bot-state`) and flush in one dispatch when the window reopens — so deferring never drops a SKU (packages are marked processed immediately; `/stock_balance` is idempotent). `_run_throttled_balance` in `main.py` orchestrates: load → `merge_pending` → if `window_open` flush all pending (reset window on success), else defer. Heartbeat shows `⏳ Stock Balance: N SKU menunggu` when deferred. `_format_balance_line` treats `failed` as a count.
 
 ## Workflow (run.yml) — required config
 - Trigger: `workflow_dispatch` only (manual from the Actions tab, or dispatched by the Telegram Worker). No `schedule`/cron.
