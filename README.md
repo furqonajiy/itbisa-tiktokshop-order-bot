@@ -13,8 +13,9 @@ cloud VM, and no database.
 Each run (dispatched manually or by the Telegram Worker — `workflow_dispatch` only, no cron) does one processing cycle:
 
 1. GitHub Actions checks out `main` for source code.
-2. The workflow overlays `data/processed_orders.json` and
-   `data/tiktokshop_tokens.json` from the `bot-state` branch when available.
+2. The workflow overlays `data/processed_orders.json`,
+   `data/tiktokshop_tokens.json`, and `data/balance_throttle.json` from the
+   `bot-state` branch when available.
 3. The Python bot loads already processed `package_id` values.
 4. TikTok Shop access tokens are refreshed if they are near expiry.
 5. The bot fetches the authorized shop cipher from
@@ -42,8 +43,15 @@ Each run (dispatched manually or by the Telegram Worker — `workflow_dispatch` 
     State is saved immediately after each successful package.
 17. After the loop, it dispatches the stock bot's `/stock_balance` once with all
     touched base SKUs (single `workflow_dispatch`; best-effort, never fatal).
+    The dispatch is throttled to at most one balance run per
+    `balance_throttle.MIN_INTERVAL_HOURS` (currently 1 hour) to conserve
+    GitHub Actions minutes; base SKUs touched while throttled accumulate in
+    `data/balance_throttle.json` and flush together when the window reopens, so
+    no touched SKU is ever dropped.
 18. At the end, the bot sends a heartbeat summary to Telegram. The heartbeat
-    appends `⚖️ Stock Balance: X/Y SKU dipicu` when a balance was dispatched.
+    appends `⚖️ Stock Balance: X/Y SKU dipicu` when a balance was dispatched, or
+    `⏳ Stock Balance: N SKU menunggu (maks. 1× / N jam)` when the dispatch was
+    deferred by the throttle.
 19. The workflow commits updated runtime state and rotated tokens back to
     `bot-state`.
 
@@ -55,10 +63,12 @@ order can contain multiple packages and each package has its own label.
 ```text
 itbisa-tiktokshop-order-bot/
 ├── .github/workflows/
-│   └── run.yml                      # GitHub Actions workflow_dispatch + bot-state sync
+│   ├── run.yml                      # GitHub Actions workflow_dispatch + bot-state sync
+│   └── ci.yml                       # Quality gate: pytest on PRs (no secrets, no bot-state)
 ├── data/                            # Runtime state bootstrap files
 │   ├── processed_orders.json        # package_id values already sent to Telegram
-│   └── tiktokshop_tokens.json       # access_token + refresh_token bundle
+│   ├── tiktokshop_tokens.json       # access_token + refresh_token bundle
+│   └── balance_throttle.json        # /stock_balance throttle state + pending SKUs
 ├── scripts/
 │   ├── bootstrap_tokens.py          # One-time / recovery token bootstrap
 │   ├── get_tiktokshop_chiper_code.py           # Diagnostic helper; name kept as-is
@@ -72,8 +82,13 @@ itbisa-tiktokshop-order-bot/
 │   ├── label_processor.py           # PDF → PNG conversion + 2-page merge
 │   ├── telegram_sender.py           # Telegram labels + Bahasa status messages
 │   ├── state_manager.py             # Loads/saves processed package state
-│   └── balance_dispatcher.py        # Dispatches /stock_balance once after the run
+│   ├── balance_dispatcher.py        # Dispatches /stock_balance once after the run
+│   └── balance_throttle.py          # 1×/window dispatch throttle + pending-SKU queue
+├── tests/                           # pytest unit tests (pure logic only)
 ├── requirements.txt
+├── requirements-dev.txt             # Dev/test dependencies (pytest)
+├── pytest.ini
+├── conftest.py
 ├── .env.example
 ├── .gitignore
 └── README.md
@@ -161,6 +176,7 @@ This repo uses two branches:
 - **bot-state** holds runtime state/token files only:
     - `data/processed_orders.json`
     - `data/tiktokshop_tokens.json`
+    - `data/balance_throttle.json`
 
 The workflow checks out `main`, overlays the latest `data/` files from
 `bot-state` if that branch exists, runs the bot, then commits updated state and
@@ -237,6 +253,23 @@ Open API calls use TikTok Shop signing:
 The workflow is `workflow_dispatch`-only — there is **no cron schedule**. It runs
 when triggered manually from the Actions tab or dispatched by the upstream
 Telegram router. Treat `.github/workflows/run.yml` as the source of truth.
+
+## Tests and CI
+
+Unit tests cover the pure logic only — `balance_dispatcher` (`to_base_sku`,
+dedup, best-effort no-token dispatch), `balance_throttle` (`merge_pending`,
+`window_open`), and the `telegram_sender` caption helpers (`_mono`,
+`build_caption` including multi-courier inline). Network/API calls and the
+label flow are not unit-tested. Install the dev dependencies and run:
+
+```powershell
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+`.github/workflows/ci.yml` runs `pytest` on pull requests that touch
+`src/`, `tests/`, `requirements*.txt`, `pytest.ini`, `conftest.py`, or the CI
+workflow itself. It needs no secrets and never touches `bot-state`.
 
 ## What the warehouse sees in Telegram
 
