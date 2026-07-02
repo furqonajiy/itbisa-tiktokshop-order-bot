@@ -41,8 +41,9 @@ Each run (dispatched manually or by the Telegram Worker — `workflow_dispatch` 
 15. The label image(s) are sent to Telegram with a Bahasa Indonesia caption.
 16. A `package_id` is marked processed only after Telegram confirms delivery.
     State is saved immediately after each successful package.
-17. After the loop, it dispatches the stock bot's `/stock_balance` once with all
-    touched base SKUs (single `workflow_dispatch`; best-effort, never fatal).
+17. After the loop, it dispatches the stock bot's `/stok_balance` (the legacy
+    `/stock_balance` alias remains accepted) once with all touched base SKUs
+    (single `workflow_dispatch`; best-effort, never fatal).
     The dispatch is throttled to at most one balance run per
     `balance_throttle.MIN_INTERVAL_HOURS` (currently 1 hour) to conserve
     GitHub Actions minutes; base SKUs touched while throttled accumulate in
@@ -68,7 +69,7 @@ itbisa-tiktokshop-order-bot/
 ├── data/                            # Runtime state bootstrap files
 │   ├── processed_orders.json        # package_id values already sent to Telegram
 │   ├── tiktokshop_tokens.json       # access_token + refresh_token bundle
-│   └── balance_throttle.json        # /stock_balance throttle state + pending SKUs
+│   └── balance_throttle.json        # /stok_balance throttle state + pending SKUs
 ├── scripts/
 │   ├── bootstrap_tokens.py          # One-time / recovery token bootstrap
 │   ├── get_tiktokshop_chiper_code.py           # Diagnostic helper; name kept as-is
@@ -82,7 +83,7 @@ itbisa-tiktokshop-order-bot/
 │   ├── label_processor.py           # PDF → PNG conversion + 2-page merge
 │   ├── telegram_sender.py           # Telegram labels + Bahasa status messages
 │   ├── state_manager.py             # Loads/saves processed package state
-│   ├── balance_dispatcher.py        # Dispatches /stock_balance once after the run
+│   ├── balance_dispatcher.py        # Dispatches /stok_balance once after the run
 │   └── balance_throttle.py          # 1×/window dispatch throttle + pending-SKU queue
 ├── tests/                           # pytest unit tests (pure logic only)
 ├── requirements.txt
@@ -166,7 +167,7 @@ Go to **Settings → Secrets and variables → Actions** and add these secrets:
 - `TIKTOKSHOP_SHOP_ID`
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
-- `STOCK_DISPATCH_TOKEN` (PAT used to dispatch the stock bot's `/stock_balance`)
+- `STOCK_DISPATCH_TOKEN` (PAT used to dispatch the stock bot's `/stok_balance`)
 
 ### Runtime state branch
 
