@@ -72,6 +72,7 @@ itbisa-tiktokshop-order-bot/
 │   └── balance_throttle.json        # /stok_balance throttle state + pending SKUs
 ├── scripts/
 │   ├── bootstrap_tokens.py          # One-time / recovery token bootstrap
+│   ├── cleanup_branches.py          # Repo maintenance: delete AI-named/merged branches (never main/bot-state)
 │   ├── get_tiktokshop_chiper_code.py           # Diagnostic helper; name kept as-is
 │   └── test_telegram.py             # Telegram send diagnostic
 ├── src/
