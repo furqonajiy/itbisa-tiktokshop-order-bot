@@ -260,9 +260,11 @@ Telegram router. Treat `.github/workflows/run.yml` as the source of truth.
 
 Unit tests cover the pure logic only — `balance_dispatcher` (`to_base_sku`,
 dedup, best-effort no-token dispatch), `balance_throttle` (`merge_pending`,
-`window_open`), and the `telegram_sender` caption helpers (`_mono`,
-`build_caption` including multi-courier inline). Network/API calls and the
-label flow are not unit-tested. Install the dev dependencies and run:
+`window_open`), the `telegram_sender` caption helpers (`_mono`,
+`build_caption` including multi-courier inline), and
+`label_processor._crop_bottom_whitespace` (ignores an isolated render speck in
+the blank tail). Network/API calls and the label PDF-render path (poppler
+`convert_from_bytes`) are not unit-tested. Install the dev dependencies and run:
 
 ```powershell
 pip install -r requirements-dev.txt

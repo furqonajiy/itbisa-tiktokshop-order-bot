@@ -9,7 +9,7 @@ Python bot: fetch TikTok Shop orders → ship packages → download/send waybill
 `src/main.py` (orchestration), `tiktokshop_client.py`, `tiktokshop_auth.py`, `label_processor.py`, `telegram_sender.py`, `state_manager.py`, `balance_dispatcher.py`, `balance_throttle.py`. Workflows: `run.yml` (execution), `ci.yml` (pytest on PRs). Tests in `tests/` (pure logic only).
 
 ## Constants & URLs
-`TOKEN_REFRESH_BUFFER_MINUTES = 10`, `STATE_RETENTION_DAYS = 3`, `MAX_ORDERS_PER_RUN = 30`, `LABEL_IMAGE_DPI = 200`. `AUTH_BASE_URL = https://auth.tiktok-shops.com`, `OPEN_API_BASE_URL = https://open-api.tiktokglobalshop.com`. Document type: `SHIPPING_LABEL_AND_PACKING_SLIP`.
+`TOKEN_REFRESH_BUFFER_MINUTES = 10`, `STATE_RETENTION_DAYS = 3`, `MAX_ORDERS_PER_RUN = 30`, `LABEL_IMAGE_DPI = 200`. `TIKTOKSHOP_AUTH_BASE_URL = https://auth.tiktok-shops.com`, `TIKTOKSHOP_OPEN_API_BASE_URL = https://open-api.tiktokglobalshop.com`. Document type: `SHIPPING_LABEL_AND_PACKING_SLIP`.
 
 ## State / tokens (committed to bot-state)
 - `data/processed_orders.json`, `data/tiktokshop_tokens.json`, `data/balance_throttle.json`. Token fields: `access_token`, `refresh_token`, `access_token_expires_at`, `refresh_token_expires_at`. **Respect `refresh_token_expires_at`.** Save rotated tokens immediately after refresh.
