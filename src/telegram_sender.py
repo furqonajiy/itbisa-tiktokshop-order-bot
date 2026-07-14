@@ -87,7 +87,7 @@ def send_label(png_pages, caption):
 
 
 def send_summary(text):
-    """Sends a plain-text message. No retry; next scheduled run will send another."""
+    """Sends a plain-text message. No retry; next run will send another."""
     url = f"{_TELEGRAM_API_URL}/sendMessage"
     data = {"chat_id": config.TELEGRAM_CHAT_ID, "text": text}
 

@@ -106,7 +106,7 @@ def ship_packages(package_ids):
     Partial failures (per-package errors inside the response body) are not
     treated as hard errors here. Any package whose shipment didn't actually
     land will simply return "not ready" when we ask for its waybill, and
-    the next scheduled run will retry.
+    the next run will retry.
     """
     if not package_ids:
         return
@@ -129,7 +129,7 @@ def get_waybill_pdf(package_id):
          is already pre-signed).
 
     Returns None if the PDF is still being rendered, so main.py can retry
-    on the next scheduled run.
+    on the next run.
     """
     path = f"/fulfillment/202309/packages/{package_id}/shipping_documents"
     extra_query = {"document_type": config.TIKTOKSHOP_DOCUMENT_TYPE}

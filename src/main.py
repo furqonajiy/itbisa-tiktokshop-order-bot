@@ -239,7 +239,7 @@ def _do_run(precheck=False):
         except Exception as e:
             # Best-effort: already-shipped packages can still get waybills,
             # and anything that didn't really ship will return "not ready"
-            # and retry on the next scheduled run.
+            # and retry on the next run.
             print(f"Batch ship failed (will continue best-effort): {e}")
     else:
         print("No packages need shipping; all are already AWAITING_COLLECTION.")
