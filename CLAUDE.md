@@ -10,7 +10,7 @@ Always write "TikTok Shop" / `tiktokshop` / `TIKTOKSHOP`. **Never shorten to "Ti
 - Python 3.11.
 - `src/main.py` (orchestration), `src/tiktokshop_client.py`, `src/tiktokshop_auth.py`, `src/label_processor.py`, `src/telegram_sender.py`, `src/state_manager.py`, `src/balance_dispatcher.py`, `src/balance_throttle.py`.
 - Workflow: `.github/workflows/run.yml` (execution, `workflow_dispatch`); `ci.yml` (quality gate — runs `pytest -q` on PRs that touch `src/`/`tests/`/`requirements*.txt`/`pytest.ini`/`conftest.py`/the CI file, pip-cached, `timeout-minutes: 10`, cancels superseded runs via `concurrency: ci-${{ github.ref }}`; PR-only, no secrets, `permissions: contents: read`, never touches `bot-state`).
-- Tests: `tests/` (pytest). Pure logic only — `balance_dispatcher` (`to_base_sku`, dedup, best-effort no-token dispatch), `balance_throttle` (`merge_pending`, `window_open`), and `telegram_sender` caption helpers (`_mono`, `build_caption` incl. multi-courier inline). Dev deps in `requirements-dev.txt`; run `pytest -q`. Network/API and the label flow are not unit-tested.
+- Tests: `tests/` (pytest). Pure logic only — `balance_dispatcher` (`to_base_sku`, dedup, best-effort no-token dispatch), `balance_throttle` (`merge_pending`, `window_open`), `telegram_sender` caption helpers (`_mono`, `build_caption` incl. multi-courier inline), and `label_processor._crop_bottom_whitespace` (bottom-crop ignores an isolated render speck in the blank tail, preserves genuine bottom content). Dev deps in `requirements-dev.txt`; run `pytest -q`. The label network/PDF-render path (poppler `convert_from_bytes`) is not unit-tested.
 - **Track unit: `package_id`** (NOT `order_id`). One order can have multiple packages; each package has its own waybill and its own Telegram send.
 
 ## Constants & URLs
@@ -34,7 +34,7 @@ Document type: `SHIPPING_LABEL_AND_PACKING_SLIP`.
 - Heartbeat summary includes the balance result.
 
 ## Label flow
-GET `/fulfillment/202309/packages/{package_id}/shipping_documents`, `document_type = SHIPPING_LABEL_AND_PACKING_SLIP`. Response has `doc_url`. **Download `doc_url` without TikTok Shop auth** (pre-signed). Retry within the run if `doc_url`/PDF not ready; if still not ready, skip and retry next run.
+GET `/fulfillment/202309/packages/{package_id}/shipping_documents`, `document_type = SHIPPING_LABEL_AND_PACKING_SLIP`. Response has `doc_url`. **Download `doc_url` without TikTok Shop auth** (pre-signed). Retry within the run if `doc_url`/PDF not ready; if still not ready, skip and retry next run. PDF → PNG, merge every 2 pages into 1 image. `label_processor._crop_bottom_whitespace` trims the blank tail below the label; a row counts as content only with ≥ `_content_row_min_dark(width)` dark pixels (≥1% of width, floor 6), so a single sub-visible render speck in the blank area can't defeat the crop and leave the whole white A4 tail attached (the intermittent "resi not cropped" bug).
 
 ## Auth
 - Auth calls are plain unsigned GET. Refresh endpoint: `https://auth.tiktok-shops.com/api/v2/token/refresh`.
