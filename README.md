@@ -69,7 +69,7 @@ itbisa-tiktokshop-order-bot/
 ├── data/                            # Runtime state bootstrap files
 │   ├── processed_orders.json        # package_id values already sent to Telegram
 │   ├── tiktokshop_tokens.json       # access_token + refresh_token bundle
-│   └── balance_throttle.json        # /stok_balance throttle state + pending SKUs
+│   └── balance_throttle.json        # created at runtime; lives on bot-state (no seed on main)
 ├── scripts/
 │   ├── bootstrap_tokens.py          # One-time / recovery token bootstrap
 │   ├── cleanup_branches.py          # Repo maintenance: delete AI-named/merged branches (never main/bot-state)
@@ -284,8 +284,8 @@ For each new package, a label image arrives with a caption like:
 🚚 JNT Express
 
 Barang:
-  • 20 x ITBISA-LED-5MM-RED
-  • 15 x ITBISA-LED-5MM-GREEN
+• 20 x ITBISA-LED-5MM-RED
+• 15 x ITBISA-LED-5MM-GREEN
 ```
 
 The caption uses SKU instead of product name because TikTok Shop product names
