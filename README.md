@@ -134,7 +134,9 @@ TELEGRAM_CHAT_ID=-100123456789
 
 TikTok Shop access and refresh tokens are not environment variables. They are
 stored in `data/tiktokshop_tokens.json` because the bot must rotate and persist
-them automatically.
+them automatically. The copy on `main` is a **placeholder only** (live tokens
+live on `bot-state` and must never be committed to `main`); bootstrap writes
+the real file locally.
 
 ### 3. Bootstrap the TikTok Shop tokens one time
 
