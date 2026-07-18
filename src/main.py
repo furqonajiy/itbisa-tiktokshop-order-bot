@@ -201,7 +201,7 @@ def _do_run(precheck=False):
         # Persist pruning from state_manager.load() even on heartbeat-only runs.
         state_manager.save(processed)
 
-        summary = telegram_sender.build_summary(_now_jakarta_hhmm(), 0, 0)
+        summary = telegram_sender.build_summary(_now_jakarta_hhmm(), 0)
         telegram_sender.send_summary(summary)
         print(f"Sent heartbeat: {summary}")
         if precheck:
@@ -246,7 +246,8 @@ def _do_run(precheck=False):
 
     # Process each package one at a time.
     success_count = 0
-    skipped_count = 0
+    waiting = []  # (package_id, reason) — skip-and-retry states, not errors
+    failed = []   # (package_id, reason) — unexpected failures
     for job in new_jobs:
         package_id = job["package_id"]
         order = job["order"]
@@ -255,7 +256,7 @@ def _do_run(precheck=False):
         pdf_bytes = tiktokshop_client.get_waybill_pdf(package_id)
         if pdf_bytes is None:
             print(f"  Skipping {package_id} (waybill not ready). Will retry next run.")
-            skipped_count += 1
+            waiting.append((package_id, "resi belum siap"))
             continue
 
         # Convert the PDF into Telegram-ready PNG images. Multiple PDF pages
@@ -288,7 +289,7 @@ def _do_run(precheck=False):
                 balance.record(item.get("seller_sku", ""))
         else:
             print("  ✗ Telegram delivery failed. Will retry next run.")
-            skipped_count += 1
+            failed.append((package_id, "kirim Telegram gagal"))
 
     # Save once more at the end so pruning from state_manager.load()
     # is persisted even when every new package was skipped.
@@ -302,13 +303,16 @@ def _do_run(precheck=False):
     balance_result = _run_throttled_balance(balance)
 
     summary = telegram_sender.build_summary(
-        _now_jakarta_hhmm(), success_count, skipped_count
+        _now_jakarta_hhmm(), success_count, waiting, failed
     )
     summary += _format_balance_line(balance_result)
     telegram_sender.send_summary(summary)
 
     print("=" * 60)
-    print(f"Run complete: {success_count} sent, {skipped_count} skipped")
+    print(
+        f"Run complete: {success_count} sent, "
+        f"{len(waiting)} waiting, {len(failed)} failed"
+    )
     print(
         f"Balance: {balance_result['dispatched']}/{balance_result['requested']} "
         f"SKU dispatched"

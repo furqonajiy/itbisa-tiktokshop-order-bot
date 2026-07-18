@@ -1,6 +1,6 @@
 # itbisa-tiktokshop-order-bot — ChatGPT Chat guide
 
-Condensed `CLAUDE.md` for ChatGPT Chat (≤ 8000 chars); `CLAUDE.md` is the full source of truth. Always write "TikTok Shop" — never "TikTok".
+Condensed `CLAUDE.md` (≤8000 chars); `CLAUDE.md` is the source of truth. Always write "TikTok Shop" — never "TikTok".
 
 ## What it is
 Python bot: fetch TikTok Shop orders → ship packages → download/send waybill labels to Telegram → dispatch stock balance once. Runs once per invocation, then exits. GitHub Actions only: no server, DB, or long-running process. **Track unit: `package_id`** (NOT `order_id`) — one order can have many packages, each with its own waybill and Telegram send.
@@ -39,7 +39,7 @@ Plain unsigned GET. Refresh: `https://auth.tiktok-shops.com/api/v2/token/refresh
 
 ## Telegram output
 - Bahasa Indonesia. Caption lines: `• {qty} x {sku}` — single space, no indent; multi-courier orders inline per SKU: `• {qty} x {sku} ({courier})`. Sent `parse_mode=Markdown`; order number, courier, SKU wrapped in backtick code spans (`_mono`, strips backticks) so they are tap-to-copy.
-- Heartbeat uses plain label `TikTok Shop` (hardcoded in `build_summary`; no `TIKTOKSHOP_LABEL` constant): e.g. `✅ TikTok Shop - 12:00 - 3 label terkirim`, `⚠️ TikTok Shop - 13:00 - 2 terkirim, 1 gagal (akan dicoba lagi)`. Append `⚖️ Stock Balance: X/Y SKU dipicu` when balance fired, or `⏳ Stock Balance: N SKU menunggu (maks. 1× / N jam)` when throttle-deferred (`_format_balance_line`). Use "stock" not "inventory" (except real endpoints like `/inventory/update`).
+- Heartbeat label `TikTok Shop` (hardcoded in `build_summary`): `✅ … 3 label terkirim`, `⚠️ … 2 terkirim, 1 menunggu TikTok Shop, 1 gagal (akan dicoba lagi)` + `⏳/❌ {package_id} — {reason}` lines (cap 10/group). Append `⚖️ Stock Balance: X/Y SKU dipicu` when balance fired, or `⏳ Stock Balance: N SKU menunggu (maks. 1× / N jam)` when throttle-deferred (`_format_balance_line`). Use "stock" not "inventory" (except real endpoints like `/inventory/update`).
 
 ## balance_dispatcher.py — duplicated across both order bots intentionally
 - `class BalanceDispatcher`: `record(sku)`, `collected()`, `dispatch_all()`. `record()`/`to_base_sku()`: strips leading `^\d+PCS-`, uppercases, ignores empty/None, dedupes via internal set.

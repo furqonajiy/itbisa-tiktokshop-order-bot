@@ -10,7 +10,7 @@ Always write "TikTok Shop" / `tiktokshop` / `TIKTOKSHOP`. **Never shorten to "Ti
 - Python 3.11.
 - `src/main.py` (orchestration), `src/tiktokshop_client.py`, `src/tiktokshop_auth.py`, `src/label_processor.py`, `src/telegram_sender.py`, `src/state_manager.py`, `src/balance_dispatcher.py`, `src/balance_throttle.py`.
 - Workflow: `.github/workflows/run.yml` (execution, `workflow_dispatch`); `ci.yml` (quality gate — runs `pytest -q` on PRs that touch `src/`/`tests/`/`requirements*.txt`/`pytest.ini`/`conftest.py`/the CI file, pip-cached, `timeout-minutes: 10`, cancels superseded runs via `concurrency: ci-${{ github.ref }}`; PR-only, no secrets, `permissions: contents: read`, never touches `bot-state`).
-- Tests: `tests/` (pytest). Pure logic only — `balance_dispatcher` (`to_base_sku`, dedup, best-effort no-token dispatch), `balance_throttle` (`merge_pending`, `window_open`), `telegram_sender` caption helpers (`_mono`, `build_caption` incl. multi-courier inline), and `label_processor._crop_bottom_whitespace` (bottom-crop ignores an isolated render speck in the blank tail, preserves genuine bottom content). Dev deps in `requirements-dev.txt`; run `pytest -q`. The label network/PDF-render path (poppler `convert_from_bytes`) is not unit-tested.
+- Tests: `tests/` (pytest). Pure logic only — `balance_dispatcher` (`to_base_sku`, dedup, best-effort no-token dispatch), `balance_throttle` (`merge_pending`, `window_open`), `telegram_sender` caption helpers (`_mono`, `build_caption` incl. multi-courier inline), `label_processor._crop_bottom_whitespace` (bottom-crop ignores an isolated render speck in the blank tail, preserves genuine bottom content), and `test_heartbeat_summary.py` (`build_summary` waiting-vs-failed split, per-package detail lines, cap + overflow). Dev deps in `requirements-dev.txt`; run `pytest -q`. The label network/PDF-render path (poppler `convert_from_bytes`) is not unit-tested.
 - **Track unit: `package_id`** (NOT `order_id`). One order can have multiple packages; each package has its own waybill and its own Telegram send.
 
 ## Constants & URLs
@@ -54,10 +54,10 @@ GET `/fulfillment/202309/packages/{package_id}/shipping_documents`, `document_ty
 ## Telegram output
 - Bahasa Indonesia.
 - Caption item lines: `• {qty} x {sku}` — single space, no leading indent. For orders with multiple distinct couriers, inline per SKU: `• {qty} x {sku} ({courier})`. The caption is sent with `parse_mode=Markdown`; order number, courier, and SKU are wrapped in backtick code spans (`_mono`) so they are tap-to-copy. `_mono` strips backticks from the value so a code span can never break and fail the label send.
-- Heartbeat uses the plain label `TikTok Shop` (hardcoded in `telegram_sender.build_summary`; no `TIKTOKSHOP_LABEL` constant in this repo):
+- Heartbeat uses the plain label `TikTok Shop` (hardcoded in `telegram_sender.build_summary`; no `TIKTOKSHOP_LABEL` constant in this repo). `build_summary(time, success, waiting, failed)` separates **skip-and-retry waits** (`waiting` = waybill still generating → "menunggu TikTok Shop") from **real failures** (`failed` = Telegram delivery error → "gagal"), and lists each pending package as `⏳/❌ {package_id} — {reason}` (capped at `_SUMMARY_DETAIL_MAX` = 10 per group, `...dan N lainnya` overflow):
     - `✅ TikTok Shop - 11:00 - Tidak ada pesanan baru`
     - `✅ TikTok Shop - 12:00 - 3 label terkirim`
-    - `⚠️ TikTok Shop - 13:00 - 2 terkirim, 1 gagal (akan dicoba lagi)`
+    - `⚠️ TikTok Shop - 13:00 - 2 terkirim, 1 menunggu TikTok Shop, 1 gagal (akan dicoba lagi)` + detail lines
 - Append `⚖️ Stock Balance: X/Y SKU dipicu` when balance fired this run (plus a `⚠️ N SKU gagal dipicu (akan dicoba lagi)` line on partial failure), or `⏳ Stock Balance: N SKU menunggu (maks. 1× / N jam)` when the dispatch was throttle-deferred. See `_format_balance_line` in `main.py`.
 
 ## balance_dispatcher.py — duplicated across both order bots intentionally
