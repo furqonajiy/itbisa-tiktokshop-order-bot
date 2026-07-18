@@ -165,16 +165,45 @@ def build_caption(order):
     )
 
 
-def build_summary(time_hhmm, success_count, skipped_count):
-    """Heartbeat message in Bahasa Indonesia."""
-    if success_count == 0 and skipped_count == 0:
+_SUMMARY_DETAIL_MAX = 10  # max package lines listed per group in the heartbeat
+
+
+def _summary_detail_lines(icon, entries):
+    """Renders '{icon} {package_id} — {reason}' lines, capped at
+    _SUMMARY_DETAIL_MAX with an '...dan N lainnya' overflow line."""
+    lines = [f"{icon} {package_id} — {reason}"
+             for package_id, reason in entries[:_SUMMARY_DETAIL_MAX]]
+    overflow = len(entries) - _SUMMARY_DETAIL_MAX
+    if overflow > 0:
+        lines.append(f"...dan {overflow} lainnya")
+    return lines
+
+
+def build_summary(time_hhmm, success_count, waiting=None, failed=None):
+    """Heartbeat message in Bahasa Indonesia.
+
+    waiting = [(package_id, reason)] for skip-and-retry states that are NOT
+    errors (waybill still generating) — counted as "menunggu TikTok Shop".
+    failed = [(package_id, reason)] for real failures (Telegram delivery
+    error) — counted as "gagal". Both groups list their package ids + reason
+    so the operator sees what is pending without opening the Actions log.
+    """
+    waiting = waiting or []
+    failed = failed or []
+    if success_count == 0 and not waiting and not failed:
         return f"✅ TikTok Shop - {time_hhmm} - Tidak ada pesanan baru"
-    if skipped_count == 0:
+    if not waiting and not failed:
         return f"✅ TikTok Shop - {time_hhmm} - {success_count} label terkirim"
-    return (
-        f"⚠️ TikTok Shop - {time_hhmm} - {success_count} terkirim, "
-        f"{skipped_count} gagal (akan dicoba lagi)"
-    )
+    parts = [f"{success_count} terkirim"]
+    if waiting:
+        parts.append(f"{len(waiting)} menunggu TikTok Shop")
+    if failed:
+        parts.append(f"{len(failed)} gagal")
+    lines = [f"⚠️ TikTok Shop - {time_hhmm} - " + ", ".join(parts)
+             + " (akan dicoba lagi)"]
+    lines.extend(_summary_detail_lines("⏳", waiting))
+    lines.extend(_summary_detail_lines("❌", failed))
+    return "\n".join(lines)
 
 
 def build_safety_stop_message(time_hhmm, package_count, max_allowed):

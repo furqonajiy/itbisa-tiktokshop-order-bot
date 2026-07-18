@@ -49,7 +49,9 @@ Each run (dispatched manually or by the Telegram Worker — `workflow_dispatch` 
     GitHub Actions minutes; base SKUs touched while throttled accumulate in
     `data/balance_throttle.json` and flush together when the window reopens, so
     no touched SKU is ever dropped.
-18. At the end, the bot sends a heartbeat summary to Telegram. The heartbeat
+18. At the end, the bot sends a heartbeat summary to Telegram. Packages
+    whose waybill is still generating are reported as "menunggu TikTok Shop"
+    with their package ids; only real errors count as "gagal". The heartbeat
     appends `⚖️ Stock Balance: X/Y SKU dipicu` when a balance was dispatched, or
     `⏳ Stock Balance: N SKU menunggu (maks. 1× / N jam)` when the dispatch was
     deferred by the throttle.
