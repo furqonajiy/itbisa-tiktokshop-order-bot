@@ -30,6 +30,7 @@ Document type: `SHIPPING_LABEL_AND_PACKING_SLIP`.
 - New packages > `MAX_ORDERS_PER_RUN` → stop and alert via Telegram.
 - Batch-ship every package whose source order is `AWAITING_SHIPMENT`. `AWAITING_COLLECTION` packages are already shipped — only download the waybill.
 - Per `package_id`: request shipping document → get `doc_url` → download PDF (no auth; pre-signed) → convert to PNG, merge every 2 pages into 1 image → send → mark processed ONLY after Telegram confirms delivery → save state immediately → record every `seller_sku` from `order.line_items` into the balance dispatcher.
+- **Per-package error containment (do not regress):** `get_waybill_pdf` returns `None` for the not-ready path but **raises** on a hard/transient API error, and `pdf_to_pngs` can raise on a malformed PDF. Both are wrapped in the per-package loop and recorded (`failed`: "resi gagal dibuat" / "render resi gagal") then `continue`, so **one bad package can never abort the run** and strand the packages queued behind it.
 - After the loop + final save: dispatch `/stok_balance` (the legacy `/stock_balance` alias remains accepted) once with all touched base SKUs in a single `workflow_dispatch`.
 - Heartbeat summary includes the balance result.
 
