@@ -253,7 +253,18 @@ def _do_run(precheck=False):
         order = job["order"]
         print(f"\nProcessing package {package_id} (order {order['id']})...")
 
-        pdf_bytes = tiktokshop_client.get_waybill_pdf(package_id)
+        # get_waybill_pdf returns None when TikTok Shop is still generating
+        # the waybill, but RAISES on a hard/transient API error. An unguarded
+        # raise aborts the whole run, stranding every package queued behind
+        # this one — so catch it and treat it as a per-package failure.
+        try:
+            pdf_bytes = tiktokshop_client.get_waybill_pdf(package_id)
+        except Exception as e:
+            print(f"  ✗ Failed to get waybill for {package_id}: {e}")
+            print(f"    Will retry next run.")
+            failed.append((package_id, "resi gagal dibuat"))
+            continue
+
         if pdf_bytes is None:
             print(f"  Skipping {package_id} (waybill not ready). Will retry next run.")
             waiting.append((package_id, "resi belum siap"))
@@ -261,8 +272,16 @@ def _do_run(precheck=False):
 
         # Convert the PDF into Telegram-ready PNG images. Multiple PDF pages
         # are merged two pages per image to reduce Telegram messages while
-        # keeping the label order unchanged.
-        png_pages = label_processor.pdf_to_pngs(pdf_bytes)
+        # keeping the label order unchanged. A malformed PDF would raise out
+        # of poppler — same containment rule, never let one package kill the
+        # whole batch.
+        try:
+            png_pages = label_processor.pdf_to_pngs(pdf_bytes)
+        except Exception as e:
+            print(f"  ✗ Failed to render waybill for {package_id}: {e}")
+            print(f"    Will retry next run.")
+            failed.append((package_id, "render resi gagal"))
+            continue
         print(f"  Rendered {len(png_pages)} Telegram waybill image(s) from PDF")
 
         caption = telegram_sender.build_caption(order)
