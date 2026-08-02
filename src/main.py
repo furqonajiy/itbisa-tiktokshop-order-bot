@@ -201,7 +201,21 @@ def _do_run(precheck=False):
         # Persist pruning from state_manager.load() even on heartbeat-only runs.
         state_manager.save(processed)
 
+        # Drain the balance queue here too. Nothing shipped THIS run, but SKUs
+        # deferred by the throttle (or left over from a failed dispatch) are
+        # persisted in balance_throttle, and returning early used to skip
+        # _run_throttled_balance entirely — so a pending SKU could only ever be
+        # flushed by the arrival of an unrelated new package. In a quiet period
+        # that strands it indefinitely and breaks the "withholding never drops
+        # a SKU" guarantee. The empty per-run collector merges nothing new and
+        # flushes whatever is already pending once the window is open.
+        balance_result = _run_throttled_balance(balance)
+
         summary = telegram_sender.build_summary(_now_jakarta_hhmm(), 0)
+        # Only append when there was pending work, so a genuinely idle run keeps
+        # its one-line heartbeat.
+        if balance_result["requested"] > 0:
+            summary += "\n" + _format_balance_line(balance_result)
         telegram_sender.send_summary(summary)
         print(f"Sent heartbeat: {summary}")
         if precheck:
