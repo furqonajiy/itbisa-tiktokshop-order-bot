@@ -120,6 +120,44 @@ def ship_packages(package_ids):
 # Public function 3: get_waybill_pdf
 # ============================================================
 
+# Phrases that identify a shipping document TikTok Shop is still generating.
+# Matched case-insensitively against the response `message`.
+#
+# Deliberately keyed on the message rather than the code because the pending
+# codes are not documented and guessing a number would be worse than useless:
+# a wrong guess would silently reclassify a real failure as "waiting", which is
+# exactly the bug this list exists to prevent. Add a code to
+# _PENDING_DOCUMENT_CODES below once one is actually observed in a run log.
+_PENDING_DOCUMENT_PHRASES = (
+    "not ready",
+    "not yet ready",
+    "still generating",
+    "generating",
+    "in progress",
+    "processing",
+    "being created",
+    "try again later",
+)
+
+# Response codes confirmed to mean "still generating". Empty until one is
+# observed live — see the comment above.
+_PENDING_DOCUMENT_CODES = frozenset()
+
+
+def _is_document_pending(code, message):
+    """True only for a response that means 'the document is still generating'.
+
+    Everything else — auth, permission, invalid package, rate limit, server
+    error, malformed payload — must raise. The asymmetry is deliberate:
+    misreading a pending response as a hard error costs one misleading
+    heartbeat line and the package retries next run, while misreading a hard
+    error as pending hides it forever behind `resi belum siap`. Pure."""
+    if code in _PENDING_DOCUMENT_CODES:
+        return True
+    text = str(message or "").lower()
+    return any(p in text for p in _PENDING_DOCUMENT_PHRASES)
+
+
 def get_waybill_pdf(package_id):
     """Generates and downloads the waybill PDF for one package.
 
@@ -128,26 +166,65 @@ def get_waybill_pdf(package_id):
       2. Download the PDF from doc_url (no TikTok Shop signing needed; doc_url
          is already pre-signed).
 
-    Returns None if the PDF is still being rendered, so main.py can retry
-    on the next run.
+    Returns None ONLY when the document is still being rendered, so main.py can
+    report the package as waiting and retry next run.
+
+    RAISES RuntimeError on any hard or unexpected API failure. This used to
+    treat every non-zero code as "not ready", so an expired authorization, a
+    permission error, an invalid package id, a rate limit or a server error all
+    sat in the queue forever while each heartbeat cheerfully said
+    `resi belum siap` and the workflow stayed green.
     """
     path = f"/fulfillment/202309/packages/{package_id}/shipping_documents"
     extra_query = {"document_type": config.TIKTOKSHOP_DOCUMENT_TYPE}
 
     # Retry a few times within this run since TikTok Shop sometimes needs a
-    # moment after batch-ship to finish rendering.
+    # moment after batch-ship to finish rendering. Only PENDING responses are
+    # retried — an auth or validation failure is not going to fix itself in
+    # 10 seconds, so it raises on the first attempt.
     for attempt in range(3):
         if attempt > 0:
             time.sleep(5)
 
         response = _call_signed("GET", path, extra_query=extra_query)
-        data = response.json()
 
-        if data["code"] != 0:
-            print(f"  Waybill for {package_id} not ready (attempt {attempt + 1}/3): {data.get('message')}")
+        # Validate the envelope before indexing into it: a proxy error page or
+        # a truncated body would otherwise raise a bare KeyError/ValueError
+        # with nothing useful in it.
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"Shipping document HTTP {response.status_code} for package "
+                f"{package_id}: {response.text[:200]}"
+            )
+        try:
+            data = response.json()
+        except ValueError as e:
+            raise RuntimeError(
+                f"Shipping document response for package {package_id} was not "
+                f"JSON: {e}: {response.text[:200]}"
+            ) from e
+        if not isinstance(data, dict) or "code" not in data:
+            raise RuntimeError(
+                f"Shipping document response for package {package_id} had no "
+                f"code field: {str(data)[:200]}"
+            )
+
+        code = data.get("code")
+        message = data.get("message")
+
+        if code != 0:
+            if not _is_document_pending(code, message):
+                # Include everything needed to diagnose it from the heartbeat
+                # and the Actions log without re-running anything.
+                raise RuntimeError(
+                    f"Shipping document failed for package {package_id}: "
+                    f"code={code} message={message} "
+                    f"request_id={data.get('request_id')}"
+                )
+            print(f"  Waybill for {package_id} not ready (attempt {attempt + 1}/3): {message}")
             continue
 
-        doc_url = data["data"]["doc_url"].strip()
+        doc_url = str((data.get("data") or {}).get("doc_url") or "").strip()
         if not doc_url:
             print(f"  Waybill for {package_id} returned empty doc_url (attempt {attempt + 1}/3)")
             continue
