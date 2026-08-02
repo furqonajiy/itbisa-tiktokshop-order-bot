@@ -22,6 +22,14 @@
 ### Maintainer environment
 - The maintainer runs Windows. Any CLI command handed over must be in **PowerShell** syntax.
 
+### Verify before pushing
+- Run `pytest -q`. Add cases to the existing files in `tests/`; never add a second runner or a new test framework.
+
+### Repo-specific guards (do not weaken)
+- Always write **"TikTok Shop"** — never shorten it to "TikTok".
+- `get_waybill_pdf` returns `None` **only** when the document is still generating. Every other non-zero code raises — treating them all as "not ready" hides real failures behind a green workflow forever.
+- **Never drop a stock-balance SKU.** Withheld SKUs persist in `data/balance_throttle.json` and every run drains that queue, including a run with no new packages.
+
 ### Sync marker
 - A root file `YYYY-MM-DD_HHMM.txt` (WIB) marks the last sync. On every update to this repo, rename it to the current WIB timestamp.
 

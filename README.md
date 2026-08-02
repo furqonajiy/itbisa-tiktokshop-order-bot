@@ -48,7 +48,9 @@ Each run (dispatched manually or by the Telegram Worker — `workflow_dispatch` 
     `balance_throttle.MIN_INTERVAL_HOURS` (currently 1 hour) to conserve
     GitHub Actions minutes; base SKUs touched while throttled accumulate in
     `data/balance_throttle.json` and flush together when the window reopens, so
-    no touched SKU is ever dropped.
+    no touched SKU is ever dropped. **Every run drains that queue, including a
+    run with no new packages** — a pending SKU must never have to wait for an
+    unrelated package to arrive before it can be balanced.
 18. At the end, the bot sends a heartbeat summary to Telegram. Packages
     whose waybill is still generating are reported as "menunggu TikTok Shop"
     with their package ids; only real errors count as "gagal". The heartbeat
@@ -267,8 +269,11 @@ dedup, best-effort no-token dispatch), `balance_throttle` (`merge_pending`,
 `window_open`), the `telegram_sender` caption helpers (`_mono`,
 `build_caption` including multi-courier inline), and
 `label_processor._crop_bottom_whitespace` (ignores an isolated render speck in
-the blank tail). Network/API calls and the label PDF-render path (poppler
-`convert_from_bytes`) are not unit-tested. Install the dev dependencies and run:
+the blank tail), the heartbeat summary, the shipping-document pending-vs-hard
+error split, and the idle-run stock-balance flush. The last two drive the real
+client and `_do_run` with every boundary stubbed, so they need no network.
+Live API calls and the label PDF-render path (poppler `convert_from_bytes`)
+are not unit-tested. Install the dev dependencies and run:
 
 ```powershell
 pip install -r requirements-dev.txt
@@ -321,7 +326,14 @@ not find any unprocessed package in `AWAITING_SHIPMENT` or
 
 TikTok Shop may need a short delay after a package is moved to ready-to-ship.
 The bot retries a few times in the same run. If the waybill is still not ready,
-it skips the package and tries again on the next run.
+it skips the package, reports it as "menunggu TikTok Shop", and tries again on
+the next run.
+
+Only a genuinely pending response is treated this way. An authorization,
+permission, invalid-package, rate-limit or server error raises on the first
+attempt and is reported as "resi gagal dibuat" with the API's code, message and
+request id — those never resolve by waiting, and reporting them as "waiting"
+would hide them behind a green workflow forever.
 
 ### Telegram delivery fails
 
