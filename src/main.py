@@ -36,6 +36,7 @@ from src import (
     balance_throttle,
     config,
     label_processor,
+    order_items,
     state_manager,
     telegram_sender,
     tiktokshop_client,
@@ -186,6 +187,18 @@ def _do_run(precheck=False):
     print("Fetching pending orders from TikTok Shop...")
     orders = tiktokshop_client.get_pending_orders()
     print(f"TikTok Shop returned {len(orders)} pending orders")
+
+    # Record WHAT each pending order contains and WHICH parcel it leaves in,
+    # before any filtering. Without it a stock opname taken while orders await
+    # shipment counts a shelf whose goods are already packed, while the book
+    # still counts them on hand — and the difference looks like theft.
+    # Recorded for EVERY pending order, not just unprocessed packages: goods
+    # leave the shelf when the order is picked, not when its waybill prints.
+    try:
+        order_items.save(order_items.record(orders, order_items.load()))
+    except Exception as e:                                  # noqa: BLE001
+        # Bookkeeping must never block a waybill. Report and continue.
+        print(f"  ⚠ gagal mencatat isi order: {e}")
 
     all_jobs = _extract_package_jobs(orders)
     print(f"Extracted {len(all_jobs)} package(s) from those orders")
