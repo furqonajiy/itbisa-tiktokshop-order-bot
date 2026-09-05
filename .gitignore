@@ -19,3 +19,8 @@ venv/
 *.swp
 .DS_Store
 .iml
+
+# Runtime state lives on the bot-state branch, never on main. Tracking it here
+# makes the runner git checkout -B bot-state abort and the whole run fails AFTER
+# the waybills were already sent.
+data/order_items.json
