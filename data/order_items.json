@@ -1,0 +1,23 @@
+{
+  "585902921407693858": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-05T17:00:52.749624+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-ABC-BATERAI-AAA-ALKALINE"
+      }
+    ],
+    "last_seen": "2026-09-05T17:00:52.749624+00:00",
+    "order_status": "AWAITING_COLLECTION",
+    "package_ids": [
+      "1209847674861814818"
+    ],
+    "pending_items": false,
+    "tracking_numbers": [
+      "JY1648196211"
+    ]
+  }
+}
