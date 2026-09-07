@@ -10,7 +10,7 @@
         "sku": "ITBISA-ABC-BATERAI-AAA-ALKALINE"
       }
     ],
-    "last_seen": "2026-09-07T09:47:14.878309+00:00",
+    "last_seen": "2026-09-07T12:25:15.001528+00:00",
     "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1209847674861814818"
@@ -19,5 +19,24 @@
     "tracking_numbers": [
       "JY1648196211"
     ]
+  },
+  "585941416896333160": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-07T12:24:51.760308+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "40PCS-ITBISA-JUMPER-MM-10CM"
+      }
+    ],
+    "last_seen": "2026-09-07T12:25:15.001528+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1210109073956570472"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
