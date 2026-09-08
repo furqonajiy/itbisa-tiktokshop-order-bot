@@ -50,12 +50,14 @@
         "sku": "ITBISA-USB-A-TO-B-30CM"
       }
     ],
-    "last_seen": "2026-09-08T05:56:58.884035+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-09-08T07:08:04.037936+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1210152165459199634"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JY1691681504"
+    ]
   }
 }
