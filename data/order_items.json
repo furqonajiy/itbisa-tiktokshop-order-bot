@@ -10,7 +10,7 @@
         "sku": "ITBISA-ABC-BATERAI-AAA-ALKALINE"
       }
     ],
-    "last_seen": "2026-09-07T12:25:15.001528+00:00",
+    "last_seen": "2026-09-08T05:56:58.884035+00:00",
     "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1209847674861814818"
@@ -35,6 +35,25 @@
     "order_status": "AWAITING_SHIPMENT",
     "package_ids": [
       "1210109073956570472"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "585948870768952978": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-08T05:56:37.206980+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-USB-A-TO-B-30CM"
+      }
+    ],
+    "last_seen": "2026-09-08T05:56:58.884035+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1210152165459199634"
     ],
     "pending_items": false,
     "tracking_numbers": []
