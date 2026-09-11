@@ -92,17 +92,20 @@
         "sku": "ITBISA-DC-TO-DC-STEPUP-XL6009"
       }
     ],
-    "last_seen": "2026-09-11T06:03:38.119314+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-09-11T08:26:06.041859+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1210548693688419917"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JY1617813787"
+    ]
   },
   "586001959210222735": {
     "couriers": [
-      "Anteraja"
+      "Anteraja",
+      "Grab"
     ],
     "first_seen": "2026-09-11T06:03:09.200694+00:00",
     "items": [
@@ -111,12 +114,14 @@
         "sku": "40PCS-ITBISA-JUMPER-MM-10CM"
       }
     ],
-    "last_seen": "2026-09-11T06:03:38.119314+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-09-11T08:26:06.041859+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1210553041084187791"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "SD-2-0HY7IN3PMVZIJ8KYPEU5"
+    ]
   }
 }
