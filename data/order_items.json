@@ -178,13 +178,15 @@
         "sku": "ITBISA-ABC-BATERAI-9V-POWER"
       }
     ],
-    "last_seen": "2026-09-14T10:49:33.862279+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-09-14T14:59:40.163480+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1210985828429628650"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JY1726491500"
+    ]
   },
   "586064606333929245": {
     "couriers": [
@@ -197,7 +199,7 @@
         "sku": "100PCS-ITBISA-IDC-2X5-AMPHENOL-FEMALE"
       }
     ],
-    "last_seen": "2026-09-14T10:49:33.862279+00:00",
+    "last_seen": "2026-09-14T14:59:40.163480+00:00",
     "order_status": "AWAITING_SHIPMENT",
     "package_ids": [
       "1210990317991724829"
@@ -216,13 +218,15 @@
         "sku": "40PCS-ITBISA-JUMPER-MF-20CM"
       }
     ],
-    "last_seen": "2026-09-14T10:49:33.862279+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-09-14T14:59:40.163480+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1211002264510367401"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JY1765121500"
+    ]
   },
   "586066092045272865": {
     "couriers": [
@@ -235,10 +239,31 @@
         "sku": "ITBISA-DC-TO-DC-STEPUP-XL6009"
       }
     ],
-    "last_seen": "2026-09-14T10:49:33.862279+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-09-14T14:59:40.163480+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1211005601880901409"
+    ],
+    "pending_items": false,
+    "tracking_numbers": [
+      "JY1712490850"
+    ]
+  },
+  "586068212131333751": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-14T14:59:32.790709+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "5PCS-ITBISA-RELAY-5V-5PIN-BLUE"
+      }
+    ],
+    "last_seen": "2026-09-14T14:59:40.163480+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1211019800427071095"
     ],
     "pending_items": false,
     "tracking_numbers": []
