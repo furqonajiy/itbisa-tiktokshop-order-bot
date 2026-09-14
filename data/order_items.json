@@ -124,5 +124,43 @@
       "SD-2-0HY7IN3PMVZIJ8KYPEU5",
       "TSA-80657271005"
     ]
+  },
+  "586057695133205515": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-14T06:30:27.332967+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-ARDUINO-UNO-R3-328P-SMD"
+      }
+    ],
+    "last_seen": "2026-09-14T06:30:35.634249+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1210920078030701579"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "586061522376951663": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-14T06:30:27.332967+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-ABC-BATERAI-9V-POWER"
+      }
+    ],
+    "last_seen": "2026-09-14T06:30:35.634249+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1210963199739004783"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
