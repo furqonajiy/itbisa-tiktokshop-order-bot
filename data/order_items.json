@@ -136,13 +136,15 @@
         "sku": "ITBISA-ARDUINO-UNO-R3-328P-SMD"
       }
     ],
-    "last_seen": "2026-09-14T06:30:35.634249+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-09-14T10:49:33.862279+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1210920078030701579"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JY1664959609"
+    ]
   },
   "586061522376951663": {
     "couriers": [
@@ -155,10 +157,88 @@
         "sku": "ITBISA-ABC-BATERAI-9V-POWER"
       }
     ],
-    "last_seen": "2026-09-14T06:30:35.634249+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-09-14T10:49:33.862279+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1210963199739004783"
+    ],
+    "pending_items": false,
+    "tracking_numbers": [
+      "JY1685309609"
+    ]
+  },
+  "586064071678985450": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-14T10:49:24.132774+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-ABC-BATERAI-9V-POWER"
+      }
+    ],
+    "last_seen": "2026-09-14T10:49:33.862279+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1210985828429628650"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "586064606333929245": {
+    "couriers": [
+      "Grab"
+    ],
+    "first_seen": "2026-09-14T10:49:24.132774+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "100PCS-ITBISA-IDC-2X5-AMPHENOL-FEMALE"
+      }
+    ],
+    "last_seen": "2026-09-14T10:49:33.862279+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1210990317991724829"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "586065937020585641": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-14T10:49:24.132774+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "40PCS-ITBISA-JUMPER-MF-20CM"
+      }
+    ],
+    "last_seen": "2026-09-14T10:49:33.862279+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1211002264510367401"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "586066092045272865": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-14T10:49:24.132774+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-DC-TO-DC-STEPUP-XL6009"
+      }
+    ],
+    "last_seen": "2026-09-14T10:49:33.862279+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1211005601880901409"
     ],
     "pending_items": false,
     "tracking_numbers": []
