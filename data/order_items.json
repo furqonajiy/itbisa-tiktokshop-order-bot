@@ -269,5 +269,66 @@
     "tracking_numbers": [
       "JY1790371650"
     ]
+  },
+  "586092013274236790": {
+    "couriers": [
+      "Anteraja"
+    ],
+    "first_seen": "2026-09-16T08:35:42.757379+00:00",
+    "items": [
+      {
+        "qty": 3,
+        "sku": "ITBISA-ARDUINO-UNO-R3-328P-SMD"
+      }
+    ],
+    "last_seen": "2026-09-16T08:35:51.768426+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1211183425089931126"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "586094456545707522": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-16T08:35:42.757379+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "10PCS-ITBISA-IC-74HC595N-DIP16"
+      }
+    ],
+    "last_seen": "2026-09-16T08:35:51.768426+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1211207166450238978"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "586097040960489320": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-16T08:35:42.757379+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "10PCS-ITBISA-IC-ULN2003AN-DIP16"
+      },
+      {
+        "qty": 2,
+        "sku": "5PCS-ITBISA-SOCKET-IC-DIP16-NARROW"
+      }
+    ],
+    "last_seen": "2026-09-16T08:35:51.768426+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1211229660393604968"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
