@@ -281,13 +281,15 @@
         "sku": "ITBISA-ARDUINO-UNO-R3-328P-SMD"
       }
     ],
-    "last_seen": "2026-09-16T08:35:51.768426+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-09-17T05:49:17.537816+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1211183425089931126"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "TSA-80388901007"
+    ]
   },
   "586094456545707522": {
     "couriers": [
