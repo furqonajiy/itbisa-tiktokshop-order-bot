@@ -332,5 +332,43 @@
     ],
     "pending_items": false,
     "tracking_numbers": []
+  },
+  "586115115612407594": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-18T05:15:51.794765+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "40PCS-ITBISA-JUMPER-FF-20CM"
+      }
+    ],
+    "last_seen": "2026-09-18T05:15:58.180223+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1211363327965366058"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "586118654272505275": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-18T05:15:51.794765+00:00",
+    "items": [
+      {
+        "qty": 2,
+        "sku": "6PCS-ITBISA-ABC-BATERAI-AAA-ALKALINE"
+      }
+    ],
+    "last_seen": "2026-09-18T05:15:58.180223+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1211388381279061435"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
