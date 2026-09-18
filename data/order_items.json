@@ -365,7 +365,7 @@
         "sku": "6PCS-ITBISA-ABC-BATERAI-AAA-ALKALINE"
       }
     ],
-    "last_seen": "2026-09-18T05:47:29.323541+00:00",
+    "last_seen": "2026-09-18T08:38:08.337703+00:00",
     "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1211388381279061435"
@@ -374,5 +374,47 @@
     "tracking_numbers": [
       "JY1790593103"
     ]
+  },
+  "586126316365252102": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-18T08:38:00.305185+00:00",
+    "items": [
+      {
+        "qty": 2,
+        "sku": "40PCS-ITBISA-JUMPER-FF-20CM"
+      },
+      {
+        "qty": 2,
+        "sku": "40PCS-ITBISA-JUMPER-MF-20CM"
+      }
+    ],
+    "last_seen": "2026-09-18T08:38:08.337703+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1211481297143367174"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "586130584546478064": {
+    "couriers": [
+      "Blitz-ID"
+    ],
+    "first_seen": "2026-09-18T08:38:00.305185+00:00",
+    "items": [
+      {
+        "qty": 2,
+        "sku": "20PCS-ITBISA-IC-PC817-DIP4"
+      }
+    ],
+    "last_seen": "2026-09-18T08:38:08.337703+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1211473125493082096"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
