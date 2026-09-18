@@ -365,7 +365,7 @@
         "sku": "6PCS-ITBISA-ABC-BATERAI-AAA-ALKALINE"
       }
     ],
-    "last_seen": "2026-09-18T08:38:08.337703+00:00",
+    "last_seen": "2026-09-18T09:55:53.358608+00:00",
     "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1211388381279061435"
@@ -390,16 +390,19 @@
         "sku": "40PCS-ITBISA-JUMPER-MF-20CM"
       }
     ],
-    "last_seen": "2026-09-18T08:38:08.337703+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-09-18T09:55:53.358608+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1211481297143367174"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JY1734445433"
+    ]
   },
   "586130584546478064": {
     "couriers": [
+      "Anteraja",
       "Blitz-ID"
     ],
     "first_seen": "2026-09-18T08:38:00.305185+00:00",
@@ -409,12 +412,14 @@
         "sku": "20PCS-ITBISA-IC-PC817-DIP4"
       }
     ],
-    "last_seen": "2026-09-18T08:38:08.337703+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-09-18T09:55:53.358608+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1211473125493082096"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "TSA-80473251007"
+    ]
   }
 }
