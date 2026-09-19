@@ -412,7 +412,7 @@
         "sku": "20PCS-ITBISA-IC-PC817-DIP4"
       }
     ],
-    "last_seen": "2026-09-18T12:19:32.114114+00:00",
+    "last_seen": "2026-09-19T05:55:08.446838+00:00",
     "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1211473125493082096"
@@ -421,5 +421,24 @@
     "tracking_numbers": [
       "TSA-80473251007"
     ]
+  },
+  "586145648499655706": {
+    "couriers": [
+      "Grab"
+    ],
+    "first_seen": "2026-09-19T05:55:00.505592+00:00",
+    "items": [
+      {
+        "qty": 2,
+        "sku": "5PCS-ITBISA-IC-74HC245N-DIP20"
+      }
+    ],
+    "last_seen": "2026-09-19T05:55:08.446838+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1211577959280575514"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
