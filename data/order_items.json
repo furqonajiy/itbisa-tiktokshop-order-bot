@@ -538,12 +538,14 @@
         "sku": "40PCS-ITBISA-JUMPER-FF-20CM"
       }
     ],
-    "last_seen": "2026-09-23T06:25:31.918029+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-09-23T12:04:31.480170+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1211948531715769894"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JY1772826367"
+    ]
   }
 }
