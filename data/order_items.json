@@ -547,5 +547,43 @@
     "tracking_numbers": [
       "JY1772826367"
     ]
+  },
+  "586221402197755428": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-24T10:39:03.452204+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-ABC-BATERAI-9V-POWER"
+      }
+    ],
+    "last_seen": "2026-09-24T10:39:10.263130+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1212099458093844004"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "586224413531407386": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-24T10:39:03.452204+00:00",
+    "items": [
+      {
+        "qty": 2,
+        "sku": "5PCS-ITBISA-IC-74HC245N-DIP20"
+      }
+    ],
+    "last_seen": "2026-09-24T10:39:10.263130+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1212119800641127450"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
