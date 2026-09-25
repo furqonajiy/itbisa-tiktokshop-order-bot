@@ -585,5 +585,24 @@
     ],
     "pending_items": false,
     "tracking_numbers": []
+  },
+  "586232977080747652": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-25T09:25:22.831165+00:00",
+    "items": [
+      {
+        "qty": 2,
+        "sku": "ITBISA-DC-TO-DC-STEPUP-XL6009"
+      }
+    ],
+    "last_seen": "2026-09-25T09:25:29.673067+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1212194791041238660"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
