@@ -642,5 +642,78 @@
     ],
     "pending_items": false,
     "tracking_numbers": []
+  },
+  "586317662377641186": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-30T05:56:57.920155+00:00",
+    "items": [
+      {
+        "qty": 2,
+        "sku": "40PCS-ITBISA-JUMPER-MF-20CM"
+      }
+    ],
+    "last_seen": "2026-09-30T05:57:07.779906+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1212775762589680866"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "586319971293103507": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-09-30T05:56:57.920155+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-RELAY-24V-4PIN-BLUE"
+      }
+    ],
+    "last_seen": "2026-09-30T05:57:07.779906+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1212791101446915475"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "586327346365695944": {
+    "couriers": [
+      "Gojek"
+    ],
+    "first_seen": "2026-09-30T05:56:57.920155+00:00",
+    "items": [
+      {
+        "qty": 3,
+        "sku": "40PCS-ITBISA-JUMPER-FF-10CM"
+      },
+      {
+        "qty": 3,
+        "sku": "40PCS-ITBISA-JUMPER-FF-20CM"
+      },
+      {
+        "qty": 2,
+        "sku": "40PCS-ITBISA-JUMPER-MF-10CM"
+      },
+      {
+        "qty": 2,
+        "sku": "40PCS-ITBISA-JUMPER-MF-20CM"
+      },
+      {
+        "qty": 2,
+        "sku": "40PCS-ITBISA-JUMPER-MM-20CM"
+      }
+    ],
+    "last_seen": "2026-09-30T05:57:07.779906+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1212829965288572872"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
