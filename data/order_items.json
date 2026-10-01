@@ -721,5 +721,28 @@
     "tracking_numbers": [
       "GK-11-894182946"
     ]
+  },
+  "586344673821295717": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-10-01T10:59:51.134474+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-JACK-DC-005-FEMALE"
+      },
+      {
+        "qty": 1,
+        "sku": "ITBISA-USB-A-TO-B-30CM"
+      }
+    ],
+    "last_seen": "2026-10-01T10:59:59.016920+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1212964892815295589"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
