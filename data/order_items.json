@@ -779,10 +779,35 @@
         "sku": "ITBISA-ABC-BATERAI-AAA-ALKALINE"
       }
     ],
-    "last_seen": "2026-10-03T05:58:27.121153+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-10-03T12:38:39.019480+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1213163367760496458"
+    ],
+    "pending_items": false,
+    "tracking_numbers": [
+      "JY1832267866"
+    ]
+  },
+  "586387006252876879": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-10-03T12:38:09.257758+00:00",
+    "items": [
+      {
+        "qty": 10,
+        "sku": "10PCS-ITBISA-PIN-HEADER-MALE-1X40PIN-LURUS"
+      },
+      {
+        "qty": 5,
+        "sku": "20PCS-ITBISA-IC-PC817-DIP4"
+      }
+    ],
+    "last_seen": "2026-10-03T12:38:39.019480+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1213269287363511375"
     ],
     "pending_items": false,
     "tracking_numbers": []
