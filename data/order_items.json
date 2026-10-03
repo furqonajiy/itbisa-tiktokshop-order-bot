@@ -779,7 +779,7 @@
         "sku": "ITBISA-ABC-BATERAI-AAA-ALKALINE"
       }
     ],
-    "last_seen": "2026-10-03T12:38:39.019480+00:00",
+    "last_seen": "2026-10-03T12:39:02.464754+00:00",
     "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1213163367760496458"
@@ -804,12 +804,14 @@
         "sku": "20PCS-ITBISA-IC-PC817-DIP4"
       }
     ],
-    "last_seen": "2026-10-03T12:38:39.019480+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-10-03T12:39:02.464754+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1213269287363511375"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JY1874420907"
+    ]
   }
 }
