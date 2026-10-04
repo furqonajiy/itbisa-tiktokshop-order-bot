@@ -804,7 +804,7 @@
         "sku": "20PCS-ITBISA-IC-PC817-DIP4"
       }
     ],
-    "last_seen": "2026-10-03T21:04:44.012253+00:00",
+    "last_seen": "2026-10-04T07:15:31.290412+00:00",
     "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1213269287363511375"
@@ -813,5 +813,24 @@
     "tracking_numbers": [
       "JY1874420907"
     ]
+  },
+  "586400653963986554": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-10-04T07:15:19.400977+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-USB-A-TO-B-30CM"
+      }
+    ],
+    "last_seen": "2026-10-04T07:15:31.290412+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1213349395446531706"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
