@@ -846,13 +846,15 @@
         "sku": "ITBISA-USB-A-TO-B-30CM"
       }
     ],
-    "last_seen": "2026-10-05T06:53:48.441296+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-10-05T07:51:18.446267+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1213394752235996877"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JX8013072902"
+    ]
   },
   "586410556495922449": {
     "couriers": [
@@ -865,10 +867,39 @@
         "sku": "ITBISA-USB-A-TO-B-30CM"
       }
     ],
-    "last_seen": "2026-10-05T06:53:48.441296+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-10-05T07:51:18.446267+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1213407345924801809"
+    ],
+    "pending_items": false,
+    "tracking_numbers": [
+      "JY1852208008"
+    ]
+  },
+  "586421609805023178": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-10-05T07:51:09.490212+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "40PCS-ITBISA-JUMPER-FF-20CM"
+      },
+      {
+        "qty": 1,
+        "sku": "40PCS-ITBISA-JUMPER-MF-20CM"
+      },
+      {
+        "qty": 1,
+        "sku": "40PCS-ITBISA-JUMPER-MM-20CM"
+      }
+    ],
+    "last_seen": "2026-10-05T07:51:18.446267+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1213499804320630730"
     ],
     "pending_items": false,
     "tracking_numbers": []
