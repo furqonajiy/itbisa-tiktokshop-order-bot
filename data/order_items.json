@@ -834,5 +834,43 @@
     "tracking_numbers": [
       "JY1808526547"
     ]
+  },
+  "586407725566494413": {
+    "couriers": [
+      "J&T-MP"
+    ],
+    "first_seen": "2026-10-05T06:53:42.637963+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-USB-A-TO-B-30CM"
+      }
+    ],
+    "last_seen": "2026-10-05T06:53:48.441296+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1213394752235996877"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
+  },
+  "586410556495922449": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-10-05T06:53:42.637963+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-USB-A-TO-B-30CM"
+      }
+    ],
+    "last_seen": "2026-10-05T06:53:48.441296+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1213407345924801809"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
