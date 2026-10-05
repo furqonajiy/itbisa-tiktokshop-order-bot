@@ -846,7 +846,7 @@
         "sku": "ITBISA-USB-A-TO-B-30CM"
       }
     ],
-    "last_seen": "2026-10-05T07:51:18.446267+00:00",
+    "last_seen": "2026-10-05T12:10:33.069629+00:00",
     "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1213394752235996877"
@@ -867,7 +867,7 @@
         "sku": "ITBISA-USB-A-TO-B-30CM"
       }
     ],
-    "last_seen": "2026-10-05T07:51:18.446267+00:00",
+    "last_seen": "2026-10-05T12:10:33.069629+00:00",
     "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1213407345924801809"
@@ -896,12 +896,14 @@
         "sku": "40PCS-ITBISA-JUMPER-MM-20CM"
       }
     ],
-    "last_seen": "2026-10-05T07:51:18.446267+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-10-05T12:10:33.069629+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1213499804320630730"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JY1821619498"
+    ]
   }
 }
