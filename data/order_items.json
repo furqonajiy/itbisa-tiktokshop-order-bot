@@ -917,12 +917,14 @@
         "sku": "ITBISA-ABC-BATERAI-AAA-ALKALINE"
       }
     ],
-    "last_seen": "2026-10-07T22:57:30.381164+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-10-08T10:30:36.512033+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1213829566036673828"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JY1918000691"
+    ]
   }
 }
