@@ -987,5 +987,26 @@
     ],
     "pending_items": false,
     "tracking_numbers": []
+  },
+  "586618291965035587": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-10-16T07:24:07.876376+00:00",
+    "items": [
+      {
+        "qty": 2,
+        "sku": "5PCS-ITBISA-RELAY-24V-4PIN-BLUE"
+      }
+    ],
+    "last_seen": "2026-10-16T07:24:16.110477+00:00",
+    "order_status": "AWAITING_COLLECTION",
+    "package_ids": [
+      "1214915289746801731"
+    ],
+    "pending_items": false,
+    "tracking_numbers": [
+      "JY1967061649"
+    ]
   }
 }
