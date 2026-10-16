@@ -88,6 +88,7 @@ itbisa-tiktokshop-order-bot/
 │   ├── tiktokshop_auth.py           # Token lifecycle + refresh-token expiry guard
 │   ├── tiktokshop_client.py         # TikTok Shop Open API calls + signing
 │   ├── label_processor.py           # PDF → PNG conversion + 2-page merge
+│   ├── packing_names.py             # Packer's short names from the stock bot's packing_names.txt
 │   ├── telegram_sender.py           # Telegram labels + Bahasa status messages
 │   ├── state_manager.py             # Loads/saves processed package state
 │   ├── balance_dispatcher.py        # Dispatches /stok_balance once after the run
