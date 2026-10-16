@@ -10,8 +10,12 @@ on:
   workflow_dispatch:
     inputs:
       packages:
-        description: "Package id(s), separated by spaces"
+        description: "Package id(s) or pending order id(s), separated by spaces"
         required: true
+      atur_kirim:
+        description: "Ship packages of AWAITING_SHIPMENT orders first (marketplace write)"
+        type: boolean
+        default: false
 
 jobs:
   fetch:
@@ -57,7 +61,8 @@ jobs:
           TELEGRAM_BOT_TOKEN: unused
           TELEGRAM_CHAT_ID: unused
           PACKAGES: ${{ inputs.packages }}
-        run: python scripts/fetch_label_sample.py $PACKAGES
+          ATUR: ${{ inputs.atur_kirim && '--atur-kirim' || '' }}
+        run: python scripts/fetch_label_sample.py $ATUR $PACKAGES
 
       # Each PDF gets its own random AES key, and that key is encrypted with
       # the public key in .github/label_sample_pub.pem. Only the holder of the
