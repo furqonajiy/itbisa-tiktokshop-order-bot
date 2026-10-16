@@ -24,3 +24,4 @@ venv/
 # makes the runner git checkout -B bot-state abort and the whole run fails AFTER
 # the waybills were already sent.
 data/order_items.json
+out/

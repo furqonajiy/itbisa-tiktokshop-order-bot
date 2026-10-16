@@ -69,7 +69,8 @@ order can contain multiple packages and each package has its own label.
 itbisa-tiktokshop-order-bot/
 ├── .github/workflows/
 │   ├── run.yml                      # GitHub Actions workflow_dispatch + bot-state sync
-│   └── ci.yml                       # Quality gate: pytest on PRs (no secrets, no bot-state)
+│   ├── ci.yml                       # Quality gate: pytest on PRs (no secrets, no bot-state)
+│   └── label_sample.yml             # Manual: waybill PDFs of labelled packages, encrypted, 1-day artifact
 ├── data/                            # Runtime state bootstrap files
 │   ├── processed_orders.json        # package_id values already sent to Telegram
 │   ├── tiktokshop_tokens.json       # access_token + refresh_token bundle
@@ -77,6 +78,7 @@ itbisa-tiktokshop-order-bot/
 ├── scripts/
 │   ├── bootstrap_tokens.py          # One-time / recovery token bootstrap
 │   ├── cleanup_branches.py          # Repo maintenance: delete AI-named/merged branches (never main/bot-state)
+│   ├── fetch_label_sample.py        # Waybill PDFs of labelled packages into out/ (run by label_sample.yml)
 │   ├── get_tiktokshop_chiper_code.py           # Diagnostic helper; name kept as-is
 │   └── test_telegram.py             # Telegram send diagnostic
 ├── src/
