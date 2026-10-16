@@ -37,6 +37,7 @@ from src import (
     config,
     label_processor,
     order_items,
+    packing_names,
     state_manager,
     telegram_sender,
     tiktokshop_client,
@@ -271,6 +272,11 @@ def _do_run(precheck=False):
     else:
         print("No packages need shipping; all are already AWAITING_COLLECTION.")
 
+    # The packer's short names, read once per run from the stock bot. If they
+    # cannot be read, every waybill goes out exactly as TikTok Shop printed it.
+    names, names_error = packing_names.load()
+    print(f"Nama packing: {len(names)} SKU" + (f" (gagal dimuat: {names_error})" if names_error else ""))
+
     # Process each package one at a time.
     success_count = 0
     waiting = []  # (package_id, reason) — skip-and-retry states, not errors
@@ -306,8 +312,13 @@ def _do_run(precheck=False):
         # keeping the label order unchanged. A malformed PDF would raise out
         # of poppler — same containment rule, never let one package kill the
         # whole batch.
+        # The packing names go on the rendered copy only; keep_pdf above kept
+        # the original. with_packing_names never raises.
+        label_pdf, renamed = label_processor.with_packing_names(pdf_bytes, names)
+        if renamed:
+            print(f"  Nama packing dipasang di {renamed} baris")
         try:
-            png_pages = label_processor.pdf_to_pngs(pdf_bytes)
+            png_pages = label_processor.pdf_to_pngs(label_pdf)
         except Exception as e:
             print(f"  ✗ Failed to render waybill for {package_id}: {e}")
             print(f"    Will retry next run.")
