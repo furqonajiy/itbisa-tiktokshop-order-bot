@@ -15,6 +15,7 @@ Multi-page behavior:
 """
 
 import io
+from pathlib import Path
 
 from PIL import Image
 from pdf2image import convert_from_bytes
@@ -168,3 +169,21 @@ def _image_to_png_bytes(image):
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     return buffer.getvalue()
+
+
+def keep_pdf(name, pdf_bytes, out_dir=None):
+    """Saves the untouched label PDF as out/<name>.pdf. Never raises.
+
+    Telegram only receives the rendered PNG, and a label can no longer be
+    downloaded once the courier has picked the package up, so this is the only
+    moment the original PDF (its text layer and exact column positions) can be
+    kept for testing label rendering. run.yml encrypts these files to
+    .github/label_sample_pub.pem and keeps them one day as an artifact.
+    A failure here must never block the label, so it is printed and swallowed.
+    """
+    try:
+        out = Path(out_dir) if out_dir else config.PROJECT_ROOT / "out"
+        out.mkdir(exist_ok=True)
+        (out / f"{name}.pdf").write_bytes(pdf_bytes)
+    except Exception as e:                                  # noqa: BLE001
+        print(f"  ⚠ PDF resi {name} tidak disimpan: {e}")

@@ -297,6 +297,10 @@ def _do_run(precheck=False):
             waiting.append((package_id, "resi belum siap"))
             continue
 
+        # Keep the untouched PDF for run.yml's encrypted one-day artifact
+        # (keep_pdf explains why). Never raises, so it cannot block the label.
+        label_processor.keep_pdf(package_id, pdf_bytes)
+
         # Convert the PDF into Telegram-ready PNG images. Multiple PDF pages
         # are merged two pages per image to reduce Telegram messages while
         # keeping the label order unchanged. A malformed PDF would raise out
