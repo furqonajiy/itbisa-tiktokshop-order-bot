@@ -52,6 +52,10 @@ jobs:
           TIKTOKSHOP_APP_KEY: ${{ secrets.TIKTOKSHOP_APP_KEY }}
           TIKTOKSHOP_APP_SECRET: ${{ secrets.TIKTOKSHOP_APP_SECRET }}
           TIKTOKSHOP_SHOP_ID: ${{ secrets.TIKTOKSHOP_SHOP_ID }}
+          # config.py requires these at import; placeholders, so this job
+          # cannot send anything to Telegram.
+          TELEGRAM_BOT_TOKEN: unused
+          TELEGRAM_CHAT_ID: unused
           PACKAGES: ${{ inputs.packages }}
         run: python scripts/fetch_label_sample.py $PACKAGES
 
