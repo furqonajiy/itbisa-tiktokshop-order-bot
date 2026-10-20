@@ -1029,5 +1029,24 @@
     "tracking_numbers": [
       "JY2091174631"
     ]
+  },
+  "586683512873125088": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-10-20T10:22:30.631120+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-ABC-BATERAI-AAA-ALKALINE"
+      }
+    ],
+    "last_seen": "2026-10-20T10:22:41.201881+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1215363128839668960"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
