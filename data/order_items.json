@@ -1069,5 +1069,24 @@
     ],
     "pending_items": false,
     "tracking_numbers": []
+  },
+  "586759747426551622": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-10-24T07:01:22.237370+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-USB-A-TO-B-30CM"
+      }
+    ],
+    "last_seen": "2026-10-24T07:01:38.869348+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1215880038596577094"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
