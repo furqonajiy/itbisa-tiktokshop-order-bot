@@ -1102,7 +1102,7 @@
         "sku": "ITBISA-USB-A-TO-B-30CM"
       }
     ],
-    "last_seen": "2026-10-26T06:34:14.949095+00:00",
+    "last_seen": "2026-10-26T09:59:09.002107+00:00",
     "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1215939274329195971"
@@ -1136,5 +1136,28 @@
     "tracking_numbers": [
       "TSA-80418171106"
     ]
+  },
+  "586797078910436875": {
+    "couriers": [
+      "Grab"
+    ],
+    "first_seen": "2026-10-26T09:58:52.683072+00:00",
+    "items": [
+      {
+        "qty": 10,
+        "sku": "10PCS-ITBISA-NPN-BC547-TO92"
+      },
+      {
+        "qty": 10,
+        "sku": "10PCS-ITBISA-NPN-BC548-TO92"
+      }
+    ],
+    "last_seen": "2026-10-26T09:59:09.002107+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1216126175031232011"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
