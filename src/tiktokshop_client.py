@@ -114,6 +114,14 @@ def ship_packages(package_ids):
     body = {"packages": [{"id": pid} for pid in package_ids]}
     response = _call_signed("POST", "/fulfillment/202309/packages/ship", body=body)
     _check_ok(response, context="batch ship packages")
+    # code 0 covers the batch only: a package TikTok Shop refused is listed in
+    # data.errors. Print each one, or the run reads "Batch ship succeeded" while
+    # the order stays AWAITING_SHIPMENT and every waybill fetch fails.
+    errors = (response.json().get("data") or {}).get("errors") or []
+    for err in errors:
+        detail = err.get("detail") or {}
+        print(f"  ✗ Ship ditolak untuk package {detail.get('package_id', '?')}: "
+              f"{err.get('message')} (code={err.get('code')}) {detail}")
 
 
 # ============================================================
