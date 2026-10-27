@@ -1152,7 +1152,7 @@
         "sku": "10PCS-ITBISA-NPN-BC548-TO92"
       }
     ],
-    "last_seen": "2026-10-27T06:04:51.827885+00:00",
+    "last_seen": "2026-10-27T06:34:16.358752+00:00",
     "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1216126175031232011"
@@ -1181,7 +1181,7 @@
         "sku": "5PCS-ITBISA-SOCKET-IC-DIP16-NARROW"
       }
     ],
-    "last_seen": "2026-10-27T06:04:51.827885+00:00",
+    "last_seen": "2026-10-27T06:34:16.358752+00:00",
     "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1216185893066015966"
@@ -1202,12 +1202,14 @@
         "sku": "ITBISA-ABC-BATERAI-AAA-ALKALINE"
       }
     ],
-    "last_seen": "2026-10-27T06:04:51.827885+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-10-27T06:34:16.358752+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1216248743112246976"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JY2062126088"
+    ]
   }
 }
