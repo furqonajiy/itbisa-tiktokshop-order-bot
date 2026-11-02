@@ -1232,5 +1232,24 @@
     "tracking_numbers": [
       "JY2104067271"
     ]
+  },
+  "586923886381925864": {
+    "couriers": [
+      "Gojek"
+    ],
+    "first_seen": "2026-11-02T09:40:20.730040+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "ITBISA-BLUETOOTH-MODULE-HC05"
+      }
+    ],
+    "last_seen": "2026-11-02T09:40:27.417622+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1217005483673355752"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
