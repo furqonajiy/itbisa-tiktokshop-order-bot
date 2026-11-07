@@ -1284,12 +1284,14 @@
         "sku": "10PCS-ITBISA-IC-CD4017BE-DIP16"
       }
     ],
-    "last_seen": "2026-11-07T06:15:07.600795+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-11-07T06:19:17.975193+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1217710950132450689"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "GK-11-898338902"
+    ]
   }
 }
