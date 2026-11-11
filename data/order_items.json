@@ -1305,13 +1305,15 @@
         "sku": "5PCS-ITBISA-IC-74HC245N-DIP20"
       }
     ],
-    "last_seen": "2026-11-11T09:24:32.339995+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-11-11T09:30:57.861066+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1218284076933678106"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "JY2223995734"
+    ]
   },
   "587111580835874253": {
     "couriers": [
@@ -1324,12 +1326,14 @@
         "sku": "ITBISA-IC-ATMEGA328P-DIP28"
       }
     ],
-    "last_seen": "2026-11-11T09:24:32.339995+00:00",
-    "order_status": "AWAITING_SHIPMENT",
+    "last_seen": "2026-11-11T09:30:57.861066+00:00",
+    "order_status": "AWAITING_COLLECTION",
     "package_ids": [
       "1218290546477204941"
     ],
     "pending_items": false,
-    "tracking_numbers": []
+    "tracking_numbers": [
+      "GK-11-898815476"
+    ]
   }
 }
