@@ -1335,5 +1335,24 @@
     "tracking_numbers": [
       "GK-11-898815476"
     ]
+  },
+  "587137881887114552": {
+    "couriers": [
+      "Gojek"
+    ],
+    "first_seen": "2026-11-12T06:38:51.981659+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "40PCS-ITBISA-JUMPER-MF-20CM"
+      }
+    ],
+    "last_seen": "2026-11-12T06:38:59.386047+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1218487883694245176"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
