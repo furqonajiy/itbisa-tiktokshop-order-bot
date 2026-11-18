@@ -1354,5 +1354,24 @@
     ],
     "pending_items": false,
     "tracking_numbers": []
+  },
+  "587243686942246381": {
+    "couriers": [
+      "Gojek"
+    ],
+    "first_seen": "2026-11-18T11:23:12.148279+00:00",
+    "items": [
+      {
+        "qty": 2,
+        "sku": "10PCS-ITBISA-IC-CD4017BE-DIP16"
+      }
+    ],
+    "last_seen": "2026-11-18T11:23:19.715158+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1219233239533716973"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
