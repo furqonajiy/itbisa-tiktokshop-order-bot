@@ -1394,5 +1394,24 @@
     "tracking_numbers": [
       "JY2363429891"
     ]
+  },
+  "587283319310484886": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-11-20T07:34:06.801664+00:00",
+    "items": [
+      {
+        "qty": 2,
+        "sku": "ITBISA-RTC-DS3231M"
+      }
+    ],
+    "last_seen": "2026-11-20T07:34:20.620211+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1219526014286988694"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
