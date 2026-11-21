@@ -1413,5 +1413,28 @@
     ],
     "pending_items": false,
     "tracking_numbers": []
+  },
+  "587304850126111901": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-11-21T08:10:13.222673+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "40PCS-ITBISA-JUMPER-FF-20CM"
+      },
+      {
+        "qty": 1,
+        "sku": "40PCS-ITBISA-JUMPER-MF-20CM"
+      }
+    ],
+    "last_seen": "2026-11-21T08:10:43.764367+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1219678304694928541"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
