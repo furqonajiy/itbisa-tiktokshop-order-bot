@@ -1480,5 +1480,24 @@
     "tracking_numbers": [
       "JY2323835094"
     ]
+  },
+  "587343003284047823": {
+    "couriers": [
+      "J&T Express"
+    ],
+    "first_seen": "2026-11-24T08:13:15.848468+00:00",
+    "items": [
+      {
+        "qty": 1,
+        "sku": "40PCS-ITBISA-JUMPER-MF-10CM"
+      }
+    ],
+    "last_seen": "2026-11-24T08:13:22.877614+00:00",
+    "order_status": "AWAITING_SHIPMENT",
+    "package_ids": [
+      "1219932151985113039"
+    ],
+    "pending_items": false,
+    "tracking_numbers": []
   }
 }
